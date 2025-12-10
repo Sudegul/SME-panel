@@ -6,13 +6,14 @@ from .database import init_db
 from .routers import (
     auth_router,
     employees_router,
-    visits_router,
     sales_router,
-    cases_router,
     goals_router,
     reports_router,
     dashboard_router,
-    feedbacks_router,
+    weekly_programs_router,
+    status_reports_router,
+    pharmacies_router,
+    daily_visits_router,
 )
 
 app = FastAPI(
@@ -33,13 +34,14 @@ app.add_middleware(
 # Include routers
 app.include_router(auth_router)
 app.include_router(employees_router)
-app.include_router(visits_router)
 app.include_router(sales_router)
-app.include_router(cases_router)
 app.include_router(goals_router)
 app.include_router(reports_router)
 app.include_router(dashboard_router)
-app.include_router(feedbacks_router)
+app.include_router(weekly_programs_router)
+app.include_router(status_reports_router)
+app.include_router(pharmacies_router)
+app.include_router(daily_visits_router)
 
 
 @app.on_event("startup")
@@ -68,3 +70,13 @@ def health_check():
     Health check endpoint
     """
     return {"status": "healthy"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True
+    )

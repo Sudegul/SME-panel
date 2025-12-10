@@ -1,21 +1,23 @@
 from .auth import router as auth_router
 from .employees import router as employees_router
-from .visits import router as visits_router
 from .sales import router as sales_router
-from .cases import router as cases_router
 from .goals import router as goals_router
 from .reports import router as reports_router
 from .dashboard import router as dashboard_router
-from .feedbacks import router as feedbacks_router
+from .weekly_programs import router as weekly_programs_router
+from .status_reports import router as status_reports_router
+from .pharmacies import router as pharmacies_router
+from .daily_visits import router as daily_visits_router
 
 __all__ = [
     "auth_router",
     "employees_router",
-    "visits_router",
     "sales_router",
-    "cases_router",
     "goals_router",
     "reports_router",
     "dashboard_router",
-    "feedbacks_router",
+    "weekly_programs_router",
+    "status_reports_router",
+    "pharmacies_router",
+    "daily_visits_router",
 ]

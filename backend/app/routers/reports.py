@@ -11,7 +11,8 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from ..database import get_db
 from ..models.employee import Employee, EmployeeRole
 from ..models.daily_report import DailyReport
-from ..models.visit import Visit
+from ..models.doctor_visit import DoctorVisit
+from ..models.pharmacy_visit import PharmacyVisit
 from ..models.sale import Sale
 from ..schemas.report import DailyReportCreate, DailyReportUpdate, DailyReportResponse
 from ..utils.dependencies import get_current_user
@@ -81,11 +82,20 @@ def create_daily_report(
     start_datetime = datetime.combine(report.report_date, datetime.min.time())
     end_datetime = datetime.combine(report.report_date, datetime.max.time())
 
-    total_visits = db.query(func.count(Visit.id)).filter(
-        Visit.employee_id == current_user.id,
-        Visit.visit_date >= start_datetime,
-        Visit.visit_date <= end_datetime
-    ).scalar()
+    # Count doctor and pharmacy visits
+    doctor_visits = db.query(func.count(DoctorVisit.id)).filter(
+        DoctorVisit.employee_id == current_user.id,
+        DoctorVisit.visit_date >= start_datetime,
+        DoctorVisit.visit_date <= end_datetime
+    ).scalar() or 0
+
+    pharmacy_visits = db.query(func.count(PharmacyVisit.id)).filter(
+        PharmacyVisit.employee_id == current_user.id,
+        PharmacyVisit.visit_date >= start_datetime,
+        PharmacyVisit.visit_date <= end_datetime
+    ).scalar() or 0
+
+    total_visits = doctor_visits + pharmacy_visits
 
     total_sales = db.query(func.count(Sale.id)).filter(
         Sale.employee_id == current_user.id,

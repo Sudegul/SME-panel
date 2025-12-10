@@ -3,9 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from '@/lib/axios';
-import { Star, TrendingUp, Users, Package, Calendar, LogOut, Moon, Sun } from 'lucide-react';
+import { Star, TrendingUp, Users, Package, Calendar } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { useTheme } from '@/contexts/ThemeContext';
 
 interface DashboardStats {
   period: { start_date: string; end_date: string };
@@ -17,13 +16,16 @@ interface DashboardStats {
 
 export default function Dashboard() {
   const router = useRouter();
-  const { theme, toggleTheme } = useTheme();
   const [user, setUser] = useState<any>(null);
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [weekStats, setWeekStats] = useState<DashboardStats | null>(null);
-  const [monthStats, setMonthStats] = useState<DashboardStats | null>(null);
+  const [visitStats, setVisitStats] = useState<DashboardStats | null>(null);
+  const [salesStats, setSalesStats] = useState<DashboardStats | null>(null);
   const [period, setPeriod] = useState<'week' | 'month' | 'year'>('month');
+  const [visitPeriod, setVisitPeriod] = useState<'today' | 'this-week' | 'last-week' | 'this-month' | 'this-year'>('this-week');
+  const [salesPeriod, setSalesPeriod] = useState<'today' | 'this-week' | 'last-week' | 'this-month' | 'this-year'>('this-month');
   const [loading, setLoading] = useState(true);
+  const [visitLoading, setVisitLoading] = useState(false);
+  const [salesLoading, setSalesLoading] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -31,29 +33,102 @@ export default function Dashboard() {
       router.push('/login');
       return;
     }
-    fetchData();
+    fetchInitialData();
+  }, []);
+
+  useEffect(() => {
+    if (user) fetchVisitStats();
+  }, [visitPeriod]);
+
+  useEffect(() => {
+    if (user) fetchSalesStats();
+  }, [salesPeriod]);
+
+  useEffect(() => {
+    if (user) fetchGraphStats();
   }, [period]);
 
-  const fetchData = async () => {
+  const fetchInitialData = async () => {
     try {
       setLoading(true);
-      const [userRes, statsRes, weekRes, monthRes] = await Promise.all([
+      const [userRes, statsRes, visitRes, salesRes] = await Promise.all([
         axios.get('/employees/me'),
         axios.get(`/dashboard/stats?period=${period}`),
-        axios.get('/dashboard/stats?period=week'),
-        axios.get('/dashboard/stats?period=month'),
+        axios.get(`/dashboard/stats?period=week`),
+        axios.get(`/dashboard/stats?period=month`),
       ]);
 
       setUser(userRes.data);
       setStats(statsRes.data);
-      setWeekStats(weekRes.data);
-      setMonthStats(monthRes.data);
-    } catch (error) {
+      setVisitStats(visitRes.data);
+      setSalesStats(salesRes.data);
+    } catch (error: any) {
       console.error('Dashboard yüklenirken hata:', error);
-      localStorage.removeItem('token');
-      router.push('/login');
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+        router.push('/login');
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchVisitStats = async () => {
+    try {
+      setVisitLoading(true);
+      let visitPeriodParam = 'week';
+      if (visitPeriod === 'today') visitPeriodParam = 'day';
+      else if (visitPeriod === 'this-week') visitPeriodParam = 'week';
+      else if (visitPeriod === 'last-week') visitPeriodParam = 'last-week';
+      else if (visitPeriod === 'this-month') visitPeriodParam = 'month';
+      else if (visitPeriod === 'this-year') visitPeriodParam = 'year';
+
+      const res = await axios.get(`/dashboard/stats?period=${visitPeriodParam}`);
+      setVisitStats(res.data);
+    } catch (error: any) {
+      console.error('Ziyaret istatistikleri yüklenirken hata:', error);
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+        router.push('/login');
+      }
+    } finally {
+      setVisitLoading(false);
+    }
+  };
+
+  const fetchSalesStats = async () => {
+    try {
+      setSalesLoading(true);
+      let salesPeriodParam = 'month';
+      if (salesPeriod === 'today') salesPeriodParam = 'day';
+      else if (salesPeriod === 'this-week') salesPeriodParam = 'week';
+      else if (salesPeriod === 'last-week') salesPeriodParam = 'last-week';
+      else if (salesPeriod === 'this-month') salesPeriodParam = 'month';
+      else if (salesPeriod === 'this-year') salesPeriodParam = 'year';
+
+      const res = await axios.get(`/dashboard/stats?period=${salesPeriodParam}`);
+      setSalesStats(res.data);
+    } catch (error: any) {
+      console.error('Satış istatistikleri yüklenirken hata:', error);
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+        router.push('/login');
+      }
+    } finally {
+      setSalesLoading(false);
+    }
+  };
+
+  const fetchGraphStats = async () => {
+    try {
+      const res = await axios.get(`/dashboard/stats?period=${period}`);
+      setStats(res.data);
+    } catch (error: any) {
+      console.error('Grafik istatistikleri yüklenirken hata:', error);
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+        router.push('/login');
+      }
     }
   };
 
@@ -90,62 +165,18 @@ export default function Dashboard() {
       ];
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm border-b dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <img src="/images/logo.png" alt="Logo" className="h-12 w-auto" />
-            <div className="flex items-center gap-4">
-              <button
-                onClick={toggleTheme}
-                className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                title={theme === 'dark' ? 'Açık moda geç' : 'Koyu moda geç'}
-              >
-                {theme === 'dark' ? <Sun className="w-5 h-5 text-yellow-500" /> : <Moon className="w-5 h-5 text-gray-700" />}
-              </button>
-              <span className="text-sm text-gray-600 dark:text-gray-300">{user?.full_name} ({user?.role})</span>
-              <button
-                onClick={() => { localStorage.removeItem('token'); router.push('/login'); }}
-                className="flex items-center gap-2 text-sm text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-              >
-                <LogOut className="w-4 h-4" />
-                Çıkış
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Navigation */}
-      <nav className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex gap-6">
-            <button className="py-4 px-2 border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 font-medium">Dashboard</button>
-            <button onClick={() => router.push('/doctors')} className="py-4 px-2 border-b-2 border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Doktorlar</button>
-            <button onClick={() => router.push('/pharmacies')} className="py-4 px-2 border-b-2 border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Eczaneler</button>
-            <button onClick={() => router.push('/cases')} className="py-4 px-2 border-b-2 border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Vakalar</button>
-            {user?.role === 'MANAGER' && (
-              <button onClick={() => router.push('/reports')} className="py-4 px-2 border-b-2 border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Raporlar</button>
-            )}
-            {(user?.role === 'MANAGER' || user?.role === 'ADMIN') && (
-              <button onClick={() => router.push('/users')} className="py-4 px-2 border-b-2 border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Kullanıcılar</button>
-            )}
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Haftanın Yıldızı */}
-        <div className="mb-8 bg-gradient-to-r from-yellow-400 to-orange-500 dark:from-yellow-500 dark:to-orange-600 rounded-lg p-6 shadow-lg">
-          <div className="flex items-center gap-4">
-            <div className="animate-spin-slow">
-              <Star className="w-12 h-12 text-white fill-white" />
+        <div className="mb-8 bg-gradient-to-r from-emerald-700/85 via-teal-700/83 via-emerald-600/81 to-teal-600/80 dark:from-emerald-700/42 dark:via-teal-700/39 dark:via-emerald-600/36 dark:to-teal-600/34 rounded-xl p-8 shadow-2xl backdrop-blur-md border border-white/20 dark:border-white/10">
+          <div className="flex items-center gap-6">
+            <div className="animate-spin-slow relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-orange-300/30 to-amber-400/30 rounded-full blur-xl"></div>
+              <Star className="w-14 h-14 text-orange-300/95 fill-orange-300/95 relative z-10 drop-shadow-lg" />
             </div>
-            <div className="text-white">
-              <h3 className="text-lg font-semibold">Haftanın Yıldızı</h3>
-              <p className="text-2xl font-bold">Ahmet Kaya</p>
-              <p className="text-sm opacity-90">245 kutu satış</p>
+            <div className="text-white drop-shadow-md">
+              <h3 className="text-xl font-semibold mb-1">Haftanın Yıldızı</h3>
+              <p className="text-3xl font-bold mb-1">Ahmet Kaya</p>
+              <p className="text-sm opacity-95">245 kutu satış</p>
             </div>
           </div>
         </div>
@@ -175,45 +206,76 @@ export default function Dashboard() {
 
         {/* 3 Bölüm */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Son 1 Hafta Ziyaretleri */}
+          {/* Toplam Ziyaretler */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900 p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Son 1 Hafta Ziyaretleri</h3>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Toplam Ziyaretler</h3>
+              </div>
+              <select
+                value={visitPeriod}
+                onChange={(e) => setVisitPeriod(e.target.value as any)}
+                className="text-sm px-2 py-1 border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
+              >
+                <option value="today">Bugün</option>
+                <option value="this-week">Bu Hafta</option>
+                <option value="last-week">Geçen Hafta</option>
+                <option value="this-month">Bu Ay</option>
+                <option value="this-year">Bu Yıl</option>
+              </select>
             </div>
-            {weekStats && (
+            {visitStats && (
               <div className="space-y-3">
                 <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Toplam Ziyaret</p>
-                  <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{weekStats.visits.total}</p>
+                  <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{visitStats.visits.total}</p>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Doktor:</span>
-                  <span className="font-semibold dark:text-gray-200">{weekStats.visits.doctor}</span>
+                  <span className="text-gray-600 dark:text-gray-400">Hekim:</span>
+                  <span className="font-semibold dark:text-gray-200">{visitStats.visits.doctor}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600 dark:text-gray-400">Eczane:</span>
-                  <span className="font-semibold dark:text-gray-200">{weekStats.visits.pharmacy}</span>
+                  <span className="font-semibold dark:text-gray-200">{visitStats.visits.pharmacy}</span>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Son 1 Ay Satışları */}
+          {/* Toplam Satışlar */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900 p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <Package className="w-6 h-6 text-green-600 dark:text-green-400" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Son 1 Ay Satışları</h3>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <Package className="w-6 h-6 text-green-600 dark:text-green-400" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Toplam Satışlar</h3>
+              </div>
+              <select
+                value={salesPeriod}
+                onChange={(e) => setSalesPeriod(e.target.value as any)}
+                className="text-sm px-2 py-1 border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
+                disabled={salesLoading}
+              >
+                <option value="today">Bugün</option>
+                <option value="this-week">Bu Hafta</option>
+                <option value="last-week">Geçen Hafta</option>
+                <option value="this-month">Bu Ay</option>
+                <option value="this-year">Bu Yıl</option>
+              </select>
             </div>
-            {monthStats && (
+            {salesStats && (
               <div className="space-y-3">
                 <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Toplam Satış</p>
-                  <p className="text-3xl font-bold text-green-600 dark:text-green-400">{monthStats.sales.total_count} adet</p>
+                  <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                    {salesLoading ? '...' : `${salesStats.sales.total_count} adet`}
+                  </p>
                 </div>
                 <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Toplam Gelir</p>
-                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">₺{monthStats.sales.total_revenue.toLocaleString('tr-TR')}</p>
+                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                    {salesLoading ? '...' : `₺${salesStats.sales.total_revenue.toLocaleString('tr-TR')}`}
+                  </p>
                 </div>
               </div>
             )}
@@ -251,17 +313,17 @@ export default function Dashboard() {
             )}
           </div>
         </div>
-      </main>
-
-      <style jsx global>{`
-        @keyframes spin-slow {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        .animate-spin-slow {
-          animation: spin-slow 3s linear infinite;
-        }
-      `}</style>
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          @keyframes spin-slow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+          .animate-spin-slow {
+            animation: spin-slow 3s linear infinite;
+          }
+        `
+      }} />
     </div>
   );
 }

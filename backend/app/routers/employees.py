@@ -63,7 +63,7 @@ def create_employee(
 
     db_employee = Employee(
         email=employee.email,
-        password_hash=get_password_hash(employee.password),
+        hashed_password=get_password_hash(employee.password),
         full_name=employee.full_name,
         role=employee.role,
         phone=employee.phone,
@@ -91,7 +91,7 @@ def update_employee(
 
     update_data = employee_update.dict(exclude_unset=True)
     if "password" in update_data:
-        update_data["password_hash"] = get_password_hash(update_data.pop("password"))
+        update_data["hashed_password"] = get_password_hash(update_data.pop("password"))
 
     for field, value in update_data.items():
         setattr(db_employee, field, value)
@@ -112,7 +112,7 @@ def verify_manager_password(
     """
     from ..utils.auth import verify_password
 
-    if not verify_password(password, current_user.password_hash):
+    if not verify_password(password, current_user.hashed_password):
         raise HTTPException(status_code=401, detail="Incorrect password")
 
     return {"verified": True}
@@ -134,7 +134,7 @@ def deactivate_employee(
     from ..utils.auth import verify_password
 
     # Verify manager password
-    if not verify_password(manager_password, current_user.password_hash):
+    if not verify_password(manager_password, current_user.hashed_password):
         raise HTTPException(status_code=401, detail="Incorrect manager password")
 
     db_employee = db.query(Employee).filter(Employee.id == employee_id).first()
@@ -194,7 +194,7 @@ def change_employee_role(
         )
 
     # Verify manager password
-    if not verify_password(manager_password, current_user.password_hash):
+    if not verify_password(manager_password, current_user.hashed_password):
         raise HTTPException(status_code=401, detail="Incorrect manager password")
 
     db_employee = db.query(Employee).filter(Employee.id == employee_id).first()
@@ -229,11 +229,11 @@ def change_password(
     from ..utils.auth import verify_password
 
     # Verify current password
-    if not verify_password(current_password, current_user.password_hash):
+    if not verify_password(current_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect current password")
 
     # Hash and update new password
-    current_user.password_hash = get_password_hash(new_password)
+    current_user.hashed_password = get_password_hash(new_password)
     db.commit()
 
     return {"message": "Password changed successfully"}

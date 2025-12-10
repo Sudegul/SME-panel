@@ -1,10 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'next/navigation';
 import axios from '@/lib/axios';
-import { LogOut, UserPlus, Users, Moon, Sun, UserCheck, UserX, Edit } from 'lucide-react';
+import { UserPlus, Users, UserCheck, UserX, Edit } from 'lucide-react';
 
 interface User {
   id: number;
@@ -19,7 +18,6 @@ interface User {
 
 export default function UsersPage() {
   const router = useRouter();
-  const { theme, toggleTheme } = useTheme();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -159,49 +157,8 @@ export default function UsersPage() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-white dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm border-b dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <img src="/images/logo.png" alt="Logo" className="h-12 w-auto" />
-            <div className="flex items-center gap-4">
-              <button
-                onClick={toggleTheme}
-                className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                title={theme === 'dark' ? 'Açık moda geç' : 'Koyu moda geç'}
-              >
-                {theme === 'dark' ? <Sun className="w-5 h-5 text-yellow-500" /> : <Moon className="w-5 h-5 text-gray-700" />}
-              </button>
-              <span className="text-sm text-gray-600 dark:text-gray-300">{currentUser?.full_name} ({currentUser?.role})</span>
-              <button
-                onClick={() => { localStorage.removeItem('token'); router.push('/login'); }}
-                className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 hover:text-red-700"
-              >
-                <LogOut className="w-4 h-4" />
-                Çıkış
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Navigation */}
-      <nav className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex gap-6">
-            <button onClick={() => router.push('/')} className="py-4 px-2 border-b-2 border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Dashboard</button>
-            <button onClick={() => router.push('/doctors')} className="py-4 px-2 border-b-2 border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Doktorlar</button>
-            <button onClick={() => router.push('/pharmacies')} className="py-4 px-2 border-b-2 border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Eczaneler</button>
-            <button onClick={() => router.push('/cases')} className="py-4 px-2 border-b-2 border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Vakalar</button>
-            <button onClick={() => router.push('/reports')} className="py-4 px-2 border-b-2 border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Raporlar</button>
-            <button className="py-4 px-2 border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 font-medium">Kullanıcılar</button>
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  return <>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* ADMIN Info Banner */}
         {currentUser?.role === 'ADMIN' && (
           <div className="mb-6 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 p-4 rounded-lg">
@@ -335,7 +292,6 @@ export default function UsersPage() {
             </tbody>
           </table>
         </div>
-      </main>
 
       {/* Password Verification Modal */}
       {showPasswordModal && (
@@ -467,5 +423,5 @@ export default function UsersPage() {
         </div>
       )}
     </div>
-  );
+  </>;
 }
