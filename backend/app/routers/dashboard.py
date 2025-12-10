@@ -6,9 +6,9 @@ from datetime import date, datetime, timedelta
 
 from ..database import get_db
 from ..models.employee import Employee, EmployeeRole
-from ..models.visit import Visit
+from ..models.doctor_visit import DoctorVisit
+from ..models.pharmacy_visit import PharmacyVisit
 from ..models.sale import Sale
-from ..models.case import Case, CaseStatus
 from ..models.goal import Goal
 from ..utils.dependencies import get_current_user
 
@@ -38,75 +38,90 @@ def get_dashboard_stats(
 
     # Tarih aralığını belirle
     if not start_date or not end_date:
+        today = date.today()
         if period == "day":
-            start_date = date.today()
-            end_date = date.today()
+            start_date = today
+            end_date = today
         elif period == "week":
-            start_date = date.today() - timedelta(days=7)
-            end_date = date.today()
+            # Bu hafta: Önceki pazar 00:00'dan bugüne kadar
+            weekday = today.weekday()
+            if weekday == 6:  # Bugün pazar
+                days_since_sunday = 0
+            else:
+                days_since_sunday = weekday + 1
+
+            last_sunday = today - timedelta(days=days_since_sunday)
+            start_date = last_sunday
+            end_date = today
+        elif period == "last-week":
+            # Geçen hafta: 2 pazar öncesi 00:00'dan geçen pazar 23:59'a kadar
+            weekday = today.weekday()
+            if weekday == 6:
+                days_since_sunday = 0
+            else:
+                days_since_sunday = weekday + 1
+
+            last_sunday = today - timedelta(days=days_since_sunday)
+            prev_sunday = last_sunday - timedelta(days=7)
+            start_date = prev_sunday
+            end_date = last_sunday - timedelta(days=1)  # Geçen cumartesi 23:59
         elif period == "month":
-            start_date = date.today().replace(day=1)
-            end_date = date.today()
+            start_date = today.replace(day=1)
+            end_date = today
         elif period == "year":
-            start_date = date.today().replace(month=1, day=1)
-            end_date = date.today()
+            start_date = today.replace(month=1, day=1)
+            end_date = today
         else:
             # Varsayılan: Son 30 gün
-            start_date = date.today() - timedelta(days=30)
-            end_date = date.today()
+            start_date = today - timedelta(days=30)
+            end_date = today
 
     start_datetime = datetime.combine(start_date, datetime.min.time())
     end_datetime = datetime.combine(end_date, datetime.max.time())
 
     # Ziyaret istatistikleri
-    visit_query = db.query(Visit).filter(
+    doctor_visit_query = db.query(DoctorVisit).filter(
         and_(
-            Visit.visit_date >= start_datetime,
-            Visit.visit_date <= end_datetime
+            DoctorVisit.visit_date >= start_datetime,
+            DoctorVisit.visit_date <= end_datetime
         )
     )
     if employee_id:
-        visit_query = visit_query.filter(Visit.employee_id == employee_id)
+        doctor_visit_query = doctor_visit_query.filter(DoctorVisit.employee_id == employee_id)
 
-    total_visits = visit_query.count()
-    doctor_visits = visit_query.filter(Visit.visit_type == "doctor").count()
-    pharmacy_visits = visit_query.filter(Visit.visit_type == "pharmacy").count()
-
-    # Satış istatistikleri
-    sale_query = db.query(Sale).filter(
+    pharmacy_visit_query = db.query(PharmacyVisit).filter(
         and_(
-            Sale.sale_date >= start_datetime,
-            Sale.sale_date <= end_datetime
+            PharmacyVisit.visit_date >= start_datetime,
+            PharmacyVisit.visit_date <= end_datetime
         )
     )
     if employee_id:
-        sale_query = sale_query.filter(Sale.employee_id == employee_id)
+        pharmacy_visit_query = pharmacy_visit_query.filter(PharmacyVisit.employee_id == employee_id)
 
-    total_sales = sale_query.count()
-    total_revenue = db.query(func.sum(Sale.total_amount)).filter(
+    doctor_visits = doctor_visit_query.count()
+    pharmacy_visits = pharmacy_visit_query.count()
+    total_visits = doctor_visits + pharmacy_visits
+
+    # Satış istatistikleri (Eczane ziyaretlerinden product_count toplamı)
+    product_count_query = db.query(func.sum(PharmacyVisit.product_count)).filter(
         and_(
-            Sale.sale_date >= start_datetime,
-            Sale.sale_date <= end_datetime
+            PharmacyVisit.visit_date >= start_date,
+            PharmacyVisit.visit_date <= end_date
         )
     )
     if employee_id:
-        total_revenue = total_revenue.filter(Sale.employee_id == employee_id)
-    total_revenue = total_revenue.scalar() or 0.0
+        product_count_query = product_count_query.filter(PharmacyVisit.employee_id == employee_id)
 
-    # Case istatistikleri
-    case_query = db.query(Case)
-    if employee_id:
-        case_query = case_query.filter(Case.employee_id == employee_id)
+    total_sales = product_count_query.scalar() or 0
 
-    open_cases = case_query.filter(Case.status == CaseStatus.OPEN).count()
-    in_progress_cases = case_query.filter(Case.status == CaseStatus.IN_PROGRESS).count()
-    closed_cases = case_query.filter(Case.status == CaseStatus.CLOSED).count()
+    # Gelir hesabı (şimdilik 0, ileride entegre edilecek)
+    total_revenue = 0.0
 
     # Hedef durumu
     goal_query = db.query(Goal).filter(
         and_(
-            Goal.period_start <= end_date,
-            Goal.period_end >= start_date
+            Goal.start_date <= end_date,
+            Goal.end_date >= start_date
         )
     )
     if employee_id:
@@ -116,8 +131,8 @@ def get_dashboard_stats(
 
     goal_status = None
     if current_goal:
-        visit_progress = (total_visits / current_goal.target_visits * 100) if current_goal.target_visits > 0 else 0
-        sales_progress = (total_revenue / current_goal.target_sales * 100) if current_goal.target_sales > 0 else 0
+        visit_progress = (total_visits / float(current_goal.target_visits) * 100) if current_goal.target_visits > 0 else 0
+        sales_progress = (total_revenue / float(current_goal.target_sales) * 100) if current_goal.target_sales > 0 else 0
 
         goal_status = {
             "target_visits": current_goal.target_visits,
@@ -141,12 +156,6 @@ def get_dashboard_stats(
         "sales": {
             "total_count": total_sales,
             "total_revenue": round(total_revenue, 2)
-        },
-        "cases": {
-            "open": open_cases,
-            "in_progress": in_progress_cases,
-            "closed": closed_cases,
-            "total": open_cases + in_progress_cases + closed_cases
         },
         "goal": goal_status
     }
@@ -179,26 +188,26 @@ def get_visits_chart(
 
     # Gruplama için SQL
     if group_by == "day":
-        date_trunc = func.date_trunc('day', Visit.visit_date)
+        date_trunc = func.date_trunc('day', DoctorVisit.visit_date)
     elif group_by == "week":
-        date_trunc = func.date_trunc('week', Visit.visit_date)
+        date_trunc = func.date_trunc('week', DoctorVisit.visit_date)
     elif group_by == "month":
-        date_trunc = func.date_trunc('month', Visit.visit_date)
+        date_trunc = func.date_trunc('month', DoctorVisit.visit_date)
     else:  # year
-        date_trunc = func.date_trunc('year', Visit.visit_date)
+        date_trunc = func.date_trunc('year', DoctorVisit.visit_date)
 
     query = db.query(
         date_trunc.label('period'),
-        func.count(Visit.id).label('count')
+        func.count(DoctorVisit.id).label('count')
     ).filter(
         and_(
-            Visit.visit_date >= start_datetime,
-            Visit.visit_date <= end_datetime
+            DoctorVisit.visit_date >= start_datetime,
+            DoctorVisit.visit_date <= end_datetime
         )
     )
 
     if employee_id:
-        query = query.filter(Visit.employee_id == employee_id)
+        query = query.filter(DoctorVisit.employee_id == employee_id)
 
     results = query.group_by('period').order_by('period').all()
 
@@ -305,14 +314,14 @@ def get_top_employees(
     results = db.query(
         Employee.id,
         Employee.full_name,
-        func.count(Visit.id).label('visit_count'),
+        func.count(DoctorVisit.id).label('visit_count'),
         func.count(Sale.id).label('sale_count'),
         func.coalesce(func.sum(Sale.total_amount), 0).label('total_revenue')
     ).outerjoin(
-        Visit, and_(
-            Visit.employee_id == Employee.id,
-            Visit.visit_date >= start_datetime,
-            Visit.visit_date <= end_datetime
+        DoctorVisit, and_(
+            DoctorVisit.employee_id == Employee.id,
+            DoctorVisit.visit_date >= start_datetime,
+            DoctorVisit.visit_date <= end_datetime
         )
     ).outerjoin(
         Sale, and_(

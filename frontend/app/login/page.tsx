@@ -30,29 +30,47 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center p-4">
+    <div
+      className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center p-4"
+      style={{
+        backgroundImage: theme === 'dark'
+          ? 'url(/images/dark_background.png)'
+          : 'url(/images/background.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }}
+    >
       <div className="w-full max-w-md">
         {/* Dark Mode Toggle */}
         <div className="flex justify-end mb-6">
           <button
             onClick={toggleTheme}
-            className="p-2.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors border border-gray-200 dark:border-gray-700"
+            className={`p-2.5 rounded-lg transition-colors border ${
+              theme === 'dark'
+                ? 'bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.1)] border-[rgba(255,255,255,0.1)]'
+                : 'bg-[#F4FBF6] hover:bg-[#E8F5EC] border-[#D6EEE3]'
+            }`}
             title={theme === 'dark' ? 'Açık moda geç' : 'Koyu moda geç'}
           >
-            {theme === 'dark' ? <Sun className="w-5 h-5 text-yellow-500" /> : <Moon className="w-5 h-5 text-gray-700 dark:text-gray-300" />}
+            {theme === 'dark' ? <Sun className="w-5 h-5 text-yellow-500" /> : <Moon className="w-5 h-5 text-[#1A5C47]" />}
           </button>
         </div>
 
         {/* Logo */}
         <div className="text-center mb-10">
           <div className="flex justify-center mb-4">
-            <img src="/images/logo.png" alt="Logo" className="h-24 w-auto" />
+            <img src="/images/logo.png" alt="Logo" className="h-54 w-auto" />
           </div>
           <p className="text-gray-500 dark:text-gray-400">Satış Yönetim Sistemi</p>
         </div>
 
         {/* Login Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
+        <div className={`rounded-xl shadow-sm backdrop-blur-sm p-8 ${
+          theme === 'dark'
+            ? 'bg-[rgba(255,255,255,0.05)] border-[rgba(255,255,255,0.1)]'
+            : 'bg-[#F4FBF6] border-[#D6EEE3]'
+        } border`}>
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
               <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg text-sm">
@@ -68,7 +86,11 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent outline-none transition"
+                className={`w-full px-4 py-3 border text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-[#0F4C3A] dark:focus:ring-[#1E3A32] focus:border-transparent outline-none transition ${
+                  theme === 'dark'
+                    ? 'bg-[rgba(255,255,255,0.03)] border-[rgba(255,255,255,0.1)]'
+                    : 'bg-[#E8F5EC] border-[#D6EEE3]'
+                }`}
                 placeholder="ornek@email.com"
                 required
               />
@@ -82,7 +104,11 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent outline-none transition"
+                className={`w-full px-4 py-3 border text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-[#0F4C3A] dark:focus:ring-[#1E3A32] focus:border-transparent outline-none transition ${
+                  theme === 'dark'
+                    ? 'bg-[rgba(255,255,255,0.03)] border-[rgba(255,255,255,0.1)]'
+                    : 'bg-[#E8F5EC] border-[#D6EEE3]'
+                }`}
                 placeholder="••••••••"
                 required
               />
@@ -91,7 +117,11 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-medium py-3 rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`w-full text-white font-medium py-3 rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                theme === 'dark'
+                  ? 'bg-[#264A3F] hover:bg-[#1E3A32]'
+                  : 'bg-[#1A5C47] hover:bg-[#144A39]'
+              }`}
             >
               {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
             </button>

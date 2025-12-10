@@ -1,14 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'next/navigation';
 import axios from '@/lib/axios';
-import { LogOut, Download, Calendar, Filter, FileSpreadsheet, Moon, Sun } from 'lucide-react';
+import { Download, Calendar, Filter, FileSpreadsheet } from 'lucide-react';
 
 export default function ReportsPage() {
   const router = useRouter();
-  const { theme, toggleTheme } = useTheme();
   const [user, setUser] = useState<any>(null);
   const [period, setPeriod] = useState<'day' | 'week' | 'month' | 'year'>('month');
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
@@ -82,51 +80,8 @@ export default function ReportsPage() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-white dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm border-b dark:border-gray-700 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <img src="/images/logo.png" alt="Logo" className="h-12 w-auto" />
-            <div className="flex items-center gap-4">
-              <button
-                onClick={toggleTheme}
-                className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                title={theme === 'dark' ? 'Açık moda geç' : 'Koyu moda geç'}
-              >
-                {theme === 'dark' ? <Sun className="w-5 h-5 text-yellow-500" /> : <Moon className="w-5 h-5 text-gray-700 dark:text-gray-200 dark:text-gray-200" />}
-              </button>
-              <span className="text-sm text-gray-600 dark:text-gray-300 dark:text-gray-300">{user?.full_name} ({user?.role})</span>
-              <button
-                onClick={() => { localStorage.removeItem('token'); router.push('/login'); }}
-                className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 hover:text-red-700"
-              >
-                <LogOut className="w-4 h-4" />
-                Çıkış
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Navigation */}
-      <nav className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex gap-6">
-            <button onClick={() => router.push('/')} className="py-4 px-2 border-b-2 border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Dashboard</button>
-            <button onClick={() => router.push('/doctors')} className="py-4 px-2 border-b-2 border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Doktorlar</button>
-            <button onClick={() => router.push('/pharmacies')} className="py-4 px-2 border-b-2 border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Eczaneler</button>
-            <button onClick={() => router.push('/cases')} className="py-4 px-2 border-b-2 border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Vakalar</button>
-            <button className="py-4 px-2 border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 font-medium">Raporlar</button>
-            {(user?.role === 'MANAGER' || user?.role === 'ADMIN') && (
-              <button onClick={() => router.push('/users')} className="py-4 px-2 border-b-2 border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Kullanıcılar</button>
-            )}
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  return <>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
           <div className="flex items-center gap-3 mb-8">
             <FileSpreadsheet className="w-8 h-8 text-green-600" />
@@ -275,7 +230,6 @@ export default function ReportsPage() {
             </ul>
           </div>
         </div>
-      </main>
     </div>
-  );
+  </>;
 }
