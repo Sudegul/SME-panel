@@ -3,7 +3,7 @@ from .employee import EmployeeCreate, EmployeeUpdate, EmployeeResponse
 from .sale import SaleCreate, SaleUpdate, SaleResponse
 from .goal import GoalCreate, GoalUpdate, GoalResponse
 from .report import DailyReportCreate, DailyReportUpdate, DailyReportResponse
-from .weekly_program import WeeklyProgramCreate, WeeklyProgramResponse, DayPlan, DoctorVisitPlan
+from .weekly_program import WeeklyProgramCreate, WeeklyProgramResponse, DayPlan, HospitalVisitPlan
 from .daily_visit import (
     DoctorVisitCreate, DoctorVisitResponse,
     PharmacyVisitCreate, PharmacyVisitResponse,
@@ -28,7 +28,7 @@ __all__ = [
     "WeeklyProgramCreate",
     "WeeklyProgramResponse",
     "DayPlan",
-    "DoctorVisitPlan",
+    "HospitalVisitPlan",
     "DoctorVisitCreate",
     "DoctorVisitResponse",
     "PharmacyVisitCreate",

@@ -14,6 +14,7 @@ from .routers import (
     status_reports_router,
     pharmacies_router,
     daily_visits_router,
+    settings_router,
 )
 
 app = FastAPI(
@@ -42,6 +43,7 @@ app.include_router(weekly_programs_router)
 app.include_router(status_reports_router)
 app.include_router(pharmacies_router)
 app.include_router(daily_visits_router)
+app.include_router(settings_router)
 
 
 @app.on_event("startup")

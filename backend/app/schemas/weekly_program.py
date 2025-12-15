@@ -3,17 +3,16 @@ from typing import List, Optional
 from datetime import datetime, date
 
 
-class DoctorVisitPlan(BaseModel):
-    """Hastane ve doktor planı"""
+class HospitalVisitPlan(BaseModel):
+    """Hastane ziyaret planı"""
     hospital_name: str
-    doctors: List[str]
 
 
 class DayPlan(BaseModel):
     """Günlük plan"""
     date: str  # ISO format: 2025-12-08
     day_name: str  # Pazartesi, Salı, etc.
-    visits: List[DoctorVisitPlan]
+    visits: List[HospitalVisitPlan]
 
 
 class WeeklyProgramBase(BaseModel):

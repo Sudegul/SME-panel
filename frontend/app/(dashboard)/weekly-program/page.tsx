@@ -3,17 +3,17 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from '@/lib/axios';
-import { Calendar, Plus, X, Trash2, Edit } from 'lucide-react';
+import { Calendar, Plus, X, Trash2, Edit, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightIcon } from 'lucide-react';
+import CustomDateInput from '@/components/CustomDateInput';
 
-interface DoctorVisitPlan {
+interface HospitalVisitPlan {
   hospital_name: string;
-  doctors: string[];
 }
 
 interface DayPlan {
   date: string;
   day_name: string;
-  visits: DoctorVisitPlan[];
+  visits: HospitalVisitPlan[];
 }
 
 interface WeeklyProgram {
@@ -24,6 +24,8 @@ interface WeeklyProgram {
   days: DayPlan[];
   submitted: boolean;
 }
+
+type FilterMode = 'this-week' | 'date-range' | 'view-all';
 
 export default function WeeklyProgramPage() {
   const router = useRouter();
@@ -38,7 +40,32 @@ export default function WeeklyProgramPage() {
   const [editingProgram, setEditingProgram] = useState<WeeklyProgram | null>(null);
   const [currentWeek, setCurrentWeek] = useState<DayPlan[]>([]);
 
+  // Filtering states
+  const [filterMode, setFilterMode] = useState<FilterMode>('this-week');
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [currentWeekOffset, setCurrentWeekOffset] = useState(0); // For "view all" pagination
+  const [expandedPrograms, setExpandedPrograms] = useState<Set<number>>(new Set());
+
   const dayNames = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+
+  // Helper: Get Monday of a given date
+  const getMondayOfWeek = (date: Date): Date => {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+    return new Date(d.setDate(diff));
+  };
+
+  // Helper: Get week range (Monday to Sunday)
+  const getWeekRange = (monday: Date): { start: string; end: string } => {
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    return {
+      start: monday.toISOString().split('T')[0],
+      end: sunday.toISOString().split('T')[0]
+    };
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -50,12 +77,53 @@ export default function WeeklyProgramPage() {
   }, []);
 
   useEffect(() => {
-    if (selectedEmployee === 'all') {
-      setFilteredPrograms(programs);
-    } else {
-      setFilteredPrograms(programs.filter(p => p.employee_name === selectedEmployee));
+    applyFilters();
+  }, [selectedEmployee, programs, filterMode, selectedDate, endDate, currentWeekOffset]);
+
+  const applyFilters = () => {
+    let filtered = programs;
+
+    // Employee filter
+    if (selectedEmployee !== 'all') {
+      filtered = filtered.filter(p => p.employee_name === selectedEmployee);
     }
-  }, [selectedEmployee, programs]);
+
+    // Week filter based on mode
+    if (filterMode === 'this-week') {
+      const today = new Date();
+      const monday = getMondayOfWeek(today);
+      const weekRange = getWeekRange(monday);
+      filtered = filtered.filter(p => p.week_start === weekRange.start);
+    } else if (filterMode === 'date-range' && selectedDate) {
+      if (endDate) {
+        // Tarih aralığı: başlangıç haftasından bitiş haftasına kadar
+        const startDate = new Date(selectedDate);
+        const endDateObj = new Date(endDate);
+        const startMonday = getMondayOfWeek(startDate);
+        const endMonday = getMondayOfWeek(endDateObj);
+
+        filtered = filtered.filter(p => {
+          const programMonday = new Date(p.week_start);
+          return programMonday >= startMonday && programMonday <= endMonday;
+        });
+      } else {
+        // Sadece başlangıç tarihi: o günün haftası
+        const date = new Date(selectedDate);
+        const monday = getMondayOfWeek(date);
+        const weekRange = getWeekRange(monday);
+        filtered = filtered.filter(p => p.week_start === weekRange.start);
+      }
+    } else if (filterMode === 'view-all') {
+      // Group by weeks and paginate
+      const uniqueWeeks = Array.from(new Set(filtered.map(p => p.week_start))).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+      const weekToShow = uniqueWeeks[currentWeekOffset];
+      if (weekToShow) {
+        filtered = filtered.filter(p => p.week_start === weekToShow);
+      }
+    }
+
+    setFilteredPrograms(filtered);
+  };
 
   const fetchData = async () => {
     try {
@@ -119,14 +187,11 @@ export default function WeeklyProgramPage() {
     currentWeek.forEach(day => {
       day.visits.forEach(visit => {
         if (!visit.hospital_name.trim()) isValid = false;
-        visit.doctors.forEach(doctor => {
-          if (!doctor.trim()) isValid = false;
-        });
       });
     });
 
     if (!isValid) {
-      alert('Lütfen tüm hastane ve doktor isimlerini doldurun!');
+      alert('Lütfen tüm hastane isimlerini doldurun!');
       return;
     }
 
@@ -153,14 +218,11 @@ export default function WeeklyProgramPage() {
     currentWeek.forEach(day => {
       day.visits.forEach(visit => {
         if (!visit.hospital_name.trim()) isValid = false;
-        visit.doctors.forEach(doctor => {
-          if (!doctor.trim()) isValid = false;
-        });
       });
     });
 
     if (!isValid) {
-      alert('Lütfen tüm hastane ve doktor isimlerini doldurun!');
+      alert('Lütfen tüm hastane isimlerini doldurun!');
       return;
     }
 
@@ -183,7 +245,7 @@ export default function WeeklyProgramPage() {
 
   const addHospitalToDay = (dayIndex: number) => {
     const updatedWeek = [...currentWeek];
-    updatedWeek[dayIndex].visits.push({ hospital_name: '', doctors: [''] });
+    updatedWeek[dayIndex].visits.push({ hospital_name: '' });
     setCurrentWeek(updatedWeek);
   };
 
@@ -196,24 +258,6 @@ export default function WeeklyProgramPage() {
   const updateHospitalName = (dayIndex: number, hospitalIndex: number, name: string) => {
     const updatedWeek = [...currentWeek];
     updatedWeek[dayIndex].visits[hospitalIndex].hospital_name = name;
-    setCurrentWeek(updatedWeek);
-  };
-
-  const addDoctorToHospital = (dayIndex: number, hospitalIndex: number) => {
-    const updatedWeek = [...currentWeek];
-    updatedWeek[dayIndex].visits[hospitalIndex].doctors.push('');
-    setCurrentWeek(updatedWeek);
-  };
-
-  const removeDoctorFromHospital = (dayIndex: number, hospitalIndex: number, doctorIndex: number) => {
-    const updatedWeek = [...currentWeek];
-    updatedWeek[dayIndex].visits[hospitalIndex].doctors.splice(doctorIndex, 1);
-    setCurrentWeek(updatedWeek);
-  };
-
-  const updateDoctorName = (dayIndex: number, hospitalIndex: number, doctorIndex: number, name: string) => {
-    const updatedWeek = [...currentWeek];
-    updatedWeek[dayIndex].visits[hospitalIndex].doctors[doctorIndex] = name;
     setCurrentWeek(updatedWeek);
   };
 
@@ -238,46 +282,264 @@ export default function WeeklyProgramPage() {
           </button>
         </div>
 
-        {(user?.role === 'MANAGER' || user?.role === 'ADMIN') && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mr-4">Çalışan Filtrele:</label>
-            <select
-              value={selectedEmployee}
-              onChange={(e) => setSelectedEmployee(e.target.value)}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+        {/* Filters */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6 space-y-4">
+          {/* Employee Filter (Manager/Admin only) */}
+          {(user?.role === 'MANAGER' || user?.role === 'ADMIN') && (
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mr-4">Çalışan Filtrele:</label>
+              <select
+                value={selectedEmployee}
+                onChange={(e) => setSelectedEmployee(e.target.value)}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+              >
+                <option value="all">Tüm Çalışanlar</option>
+                {employees.map((emp) => (
+                  <option key={emp.id} value={emp.full_name}>{emp.full_name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Week Filter Buttons */}
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Geçmiş Haftalar */}
+            <button
+              onClick={() => {
+                const today = new Date();
+                const targetDate = new Date(today);
+                targetDate.setDate(today.getDate() - 21); // 3 hafta önce
+                setSelectedDate(targetDate.toISOString().split('T')[0]);
+                setEndDate('');
+                setFilterMode('date-range');
+                setCurrentWeekOffset(0);
+              }}
+              className="px-4 py-2 rounded-lg font-medium transition-colors bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"
             >
-              <option value="all">Tüm Çalışanlar</option>
-              {employees.map((emp) => (
-                <option key={emp.id} value={emp.full_name}>{emp.full_name}</option>
-              ))}
-            </select>
+              3 Hafta Önce
+            </button>
+
+            <button
+              onClick={() => {
+                const today = new Date();
+                const targetDate = new Date(today);
+                targetDate.setDate(today.getDate() - 14); // 2 hafta önce
+                setSelectedDate(targetDate.toISOString().split('T')[0]);
+                setEndDate('');
+                setFilterMode('date-range');
+                setCurrentWeekOffset(0);
+              }}
+              className="px-4 py-2 rounded-lg font-medium transition-colors bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"
+            >
+              2 Hafta Önce
+            </button>
+
+            <button
+              onClick={() => {
+                const today = new Date();
+                const targetDate = new Date(today);
+                targetDate.setDate(today.getDate() - 7); // Geçen hafta
+                setSelectedDate(targetDate.toISOString().split('T')[0]);
+                setEndDate('');
+                setFilterMode('date-range');
+                setCurrentWeekOffset(0);
+              }}
+              className="px-4 py-2 rounded-lg font-medium transition-colors bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"
+            >
+              Geçen Hafta
+            </button>
+
+            {/* Bu Hafta */}
+            <button
+              onClick={() => {
+                setFilterMode('this-week');
+                setCurrentWeekOffset(0);
+                setSelectedDate('');
+                setEndDate('');
+              }}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                filterMode === 'this-week'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              Bu Hafta
+            </button>
+
+            {/* Tümünü Gör */}
+            <button
+              onClick={() => {
+                setFilterMode('view-all');
+                setCurrentWeekOffset(0);
+                setSelectedDate('');
+                setEndDate('');
+              }}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                filterMode === 'view-all'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              Tümünü Gör
+            </button>
+
+            {/* Manuel Tarih Aralığı */}
+            <div className="flex items-center gap-2 border-l dark:border-gray-600 pl-4">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-200">Başlangıç:</label>
+              <CustomDateInput
+                value={selectedDate}
+                onChange={(value) => {
+                  setSelectedDate(value);
+                  if (value) {
+                    setFilterMode('date-range');
+                    setCurrentWeekOffset(0);
+                  }
+                }}
+              />
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-200">Bitiş:</label>
+              <CustomDateInput
+                value={endDate}
+                onChange={(value) => {
+                  setEndDate(value);
+                  if (value && selectedDate) {
+                    setFilterMode('date-range');
+                    setCurrentWeekOffset(0);
+                  }
+                }}
+              />
+              {(selectedDate || endDate) && (
+                <button
+                  onClick={() => {
+                    setSelectedDate('');
+                    setEndDate('');
+                    setFilterMode('this-week');
+                  }}
+                  className="px-3 py-2 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50"
+                >
+                  Temizle
+                </button>
+              )}
+            </div>
           </div>
-        )}
+
+          {/* Show selected week range */}
+          {filterMode === 'date-range' && selectedDate && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-3">
+              <p className="text-sm text-blue-900 dark:text-blue-200">
+                <strong>Seçili Hafta:</strong>{' '}
+                {(() => {
+                  if (endDate) {
+                    // Tarih aralığı seçildiğinde tüm haftaları listele
+                    const startDate = new Date(selectedDate);
+                    const endDateObj = new Date(endDate);
+                    const startMonday = getMondayOfWeek(startDate);
+                    const endMonday = getMondayOfWeek(endDateObj);
+
+                    const weeks: string[] = [];
+                    const currentWeek = new Date(startMonday);
+
+                    while (currentWeek <= endMonday) {
+                      const weekRange = getWeekRange(currentWeek);
+                      weeks.push(
+                        `${new Date(weekRange.start).toLocaleDateString('tr-TR')} - ${new Date(weekRange.end).toLocaleDateString('tr-TR')}`
+                      );
+                      currentWeek.setDate(currentWeek.getDate() + 7);
+                    }
+
+                    return weeks.join(', ');
+                  } else {
+                    // Tek tarih seçildiğinde sadece o hafta
+                    const monday = getMondayOfWeek(new Date(selectedDate));
+                    const weekRange = getWeekRange(monday);
+                    return `${new Date(weekRange.start).toLocaleDateString('tr-TR')} - ${new Date(weekRange.end).toLocaleDateString('tr-TR')}`;
+                  }
+                })()}
+              </p>
+            </div>
+          )}
+
+          {/* Pagination for "view all" mode */}
+          {filterMode === 'view-all' && (
+            <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+              <button
+                onClick={() => setCurrentWeekOffset(prev => prev + 1)}
+                disabled={currentWeekOffset >= Array.from(new Set(programs.map(p => p.week_start))).length - 1}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Önceki Hafta
+              </button>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                {(() => {
+                  const uniqueWeeks = Array.from(new Set(programs.map(p => p.week_start))).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+                  const weekToShow = uniqueWeeks[currentWeekOffset];
+                  if (weekToShow) {
+                    const monday = new Date(weekToShow);
+                    const weekRange = getWeekRange(monday);
+                    return `${new Date(weekRange.start).toLocaleDateString('tr-TR')} - ${new Date(weekRange.end).toLocaleDateString('tr-TR')}`;
+                  }
+                  return '';
+                })()}
+              </span>
+              <button
+                onClick={() => setCurrentWeekOffset(prev => Math.max(0, prev - 1))}
+                disabled={currentWeekOffset === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Sonraki Hafta
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
 
         <div className="space-y-6">
           {filteredPrograms.map((program) => (
             <div key={program.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-              <div className="p-6 border-b dark:border-gray-700 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-gray-700 dark:to-gray-800">
+              <div
+                className="p-6 border-b dark:border-gray-700 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-gray-700 dark:to-gray-800 cursor-pointer hover:opacity-90 transition-opacity"
+                onClick={() => {
+                  if (program.id) {
+                    const newExpanded = new Set(expandedPrograms);
+                    if (newExpanded.has(program.id)) {
+                      newExpanded.delete(program.id);
+                    } else {
+                      newExpanded.add(program.id);
+                    }
+                    setExpandedPrograms(newExpanded);
+                  }
+                }}
+              >
                 <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                      {new Date(program.week_start).toLocaleDateString('tr-TR')} - {new Date(program.week_end).toLocaleDateString('tr-TR')}
-                    </h3>
-                    <div className="flex items-center gap-4 mt-2">
-                      <span className="text-sm text-gray-600 dark:text-gray-300">{program.employee_name}</span>
-                      <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm">
-                        Gönderildi
-                      </span>
-                      {canEditProgram(program) && (
-                        <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded-full text-sm">
-                          Pazar 23:59'a kadar düzenlenebilir
+                  <div className="flex items-start gap-3">
+                    {program.id && expandedPrograms.has(program.id) ? (
+                      <ChevronDown className="w-6 h-6 text-gray-700 dark:text-gray-300 mt-1" />
+                    ) : (
+                      <ChevronRightIcon className="w-6 h-6 text-gray-700 dark:text-gray-300 mt-1" />
+                    )}
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                        {new Date(program.week_start).toLocaleDateString('tr-TR')} - {new Date(program.week_end).toLocaleDateString('tr-TR')}
+                      </h3>
+                      <div className="flex items-center gap-4 mt-2">
+                        <span className="text-sm text-gray-600 dark:text-gray-300">{program.employee_name}</span>
+                        <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm">
+                          Gönderildi
                         </span>
-                      )}
+                        {canEditProgram(program) && (
+                          <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded-full text-sm">
+                            Pazar 23:59'a kadar düzenlenebilir
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   {canEditProgram(program) && (
                     <button
-                      onClick={() => handleEditProgram(program)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditProgram(program);
+                      }}
                       className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >
                       <Edit className="w-4 h-4" />
@@ -287,7 +549,8 @@ export default function WeeklyProgramPage() {
                 </div>
               </div>
 
-              <div className="p-6">
+              {program.id && expandedPrograms.has(program.id) && (
+                <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {program.days.filter(day => day.visits.length > 0).map((day, dayIdx) => (
                     <div key={dayIdx} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
@@ -297,19 +560,15 @@ export default function WeeklyProgramPage() {
                       <div className="space-y-3">
                         {day.visits.map((visit, visitIdx) => (
                           <div key={visitIdx} className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
-                            <div className="font-medium text-gray-900 dark:text-white mb-2">{visit.hospital_name}</div>
-                            <div className="ml-4 space-y-1">
-                              {visit.doctors.map((doctor, docIdx) => (
-                                <div key={docIdx} className="text-sm text-gray-600 dark:text-gray-300">• {doctor}</div>
-                              ))}
-                            </div>
+                            <div className="font-medium text-gray-900 dark:text-white">{visit.hospital_name}</div>
                           </div>
                         ))}
                       </div>
                     </div>
                   ))}
                 </div>
-              </div>
+                </div>
+              )}
             </div>
           ))}
 
@@ -356,48 +615,13 @@ export default function WeeklyProgramPage() {
                     {day.visits.map((visit, hospitalIndex) => (
                       <div key={hospitalIndex} className="bg-white dark:bg-gray-800 rounded-lg p-4">
                         <div className="flex gap-3">
-                          <div className="flex-1 space-y-3">
-                            <input
-                              type="text"
-                              value={visit.hospital_name}
-                              onChange={(e) => updateHospitalName(dayIndex, hospitalIndex, e.target.value)}
-                              placeholder="Hastane adı"
-                              className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                            />
-
-                            <div className="ml-4 space-y-2">
-                              <div className="flex items-center justify-between mb-2">
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-200">Doktorlar:</label>
-                                <button
-                                  onClick={() => addDoctorToHospital(dayIndex, hospitalIndex)}
-                                  className="text-sm text-blue-600 dark:text-blue-400 flex items-center gap-1"
-                                >
-                                  <Plus className="w-3 h-3" />
-                                  Doktor Ekle
-                                </button>
-                              </div>
-
-                              {visit.doctors.map((doctor, doctorIndex) => (
-                                <div key={doctorIndex} className="flex items-center gap-2">
-                                  <input
-                                    type="text"
-                                    value={doctor}
-                                    onChange={(e) => updateDoctorName(dayIndex, hospitalIndex, doctorIndex, e.target.value)}
-                                    placeholder="Doktor adı"
-                                    className="flex-1 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white dark:border-gray-600 text-sm"
-                                  />
-                                  {visit.doctors.length > 1 && (
-                                    <button
-                                      onClick={() => removeDoctorFromHospital(dayIndex, hospitalIndex, doctorIndex)}
-                                      className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
+                          <input
+                            type="text"
+                            value={visit.hospital_name}
+                            onChange={(e) => updateHospitalName(dayIndex, hospitalIndex, e.target.value)}
+                            placeholder="Hastane adı"
+                            className="flex-1 px-4 py-2 border rounded-lg dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                          />
                           <button
                             onClick={() => removeHospitalFromDay(dayIndex, hospitalIndex)}
                             className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
@@ -476,48 +700,13 @@ export default function WeeklyProgramPage() {
                     {day.visits.map((visit, hospitalIndex) => (
                       <div key={hospitalIndex} className="bg-white dark:bg-gray-800 rounded-lg p-4">
                         <div className="flex gap-3">
-                          <div className="flex-1 space-y-3">
-                            <input
-                              type="text"
-                              value={visit.hospital_name}
-                              onChange={(e) => updateHospitalName(dayIndex, hospitalIndex, e.target.value)}
-                              placeholder="Hastane adı"
-                              className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                            />
-
-                            <div className="ml-4 space-y-2">
-                              <div className="flex items-center justify-between mb-2">
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-200">Doktorlar:</label>
-                                <button
-                                  onClick={() => addDoctorToHospital(dayIndex, hospitalIndex)}
-                                  className="text-sm text-blue-600 dark:text-blue-400 flex items-center gap-1"
-                                >
-                                  <Plus className="w-3 h-3" />
-                                  Doktor Ekle
-                                </button>
-                              </div>
-
-                              {visit.doctors.map((doctor, doctorIndex) => (
-                                <div key={doctorIndex} className="flex items-center gap-2">
-                                  <input
-                                    type="text"
-                                    value={doctor}
-                                    onChange={(e) => updateDoctorName(dayIndex, hospitalIndex, doctorIndex, e.target.value)}
-                                    placeholder="Doktor adı"
-                                    className="flex-1 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white dark:border-gray-600 text-sm"
-                                  />
-                                  {visit.doctors.length > 1 && (
-                                    <button
-                                      onClick={() => removeDoctorFromHospital(dayIndex, hospitalIndex, doctorIndex)}
-                                      className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
+                          <input
+                            type="text"
+                            value={visit.hospital_name}
+                            onChange={(e) => updateHospitalName(dayIndex, hospitalIndex, e.target.value)}
+                            placeholder="Hastane adı"
+                            className="flex-1 px-4 py-2 border rounded-lg dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                          />
                           <button
                             onClick={() => removeHospitalFromDay(dayIndex, hospitalIndex)}
                             className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
