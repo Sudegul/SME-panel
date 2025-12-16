@@ -9,6 +9,7 @@ class DoctorVisitBase(BaseModel):
     doctor_name: str
     hospital_name: str
     specialty: Optional[str] = None
+    supported_product: Optional[str] = None
     start_time: Optional[time] = None
     end_time: Optional[time] = None
     notes: Optional[str] = None

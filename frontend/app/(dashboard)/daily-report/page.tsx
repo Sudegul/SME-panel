@@ -3,13 +3,15 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from '@/lib/axios';
-import { Building, Stethoscope, Pill, Plus, X, Trash2, Edit } from 'lucide-react';
+import { Building, Stethoscope, Pill, Plus, X, Trash2, Edit, ChevronDown, ChevronRight } from 'lucide-react';
+import DateSelector from '@/components/DateSelector';
 
 interface DoctorVisit {
   id?: number;
   doctor_name: string;
   hospital_name: string;
   specialty?: string;
+  supported_product?: string;
   notes?: string;
 }
 
@@ -33,18 +35,41 @@ interface PharmacySearchResult {
   is_approved: boolean;
 }
 
+interface EmployeeDailyReport {
+  employee_id: number;
+  employee_name: string;
+  doctor_visits: DoctorVisit[];
+  pharmacy_visits: PharmacyVisit[];
+}
+
+interface ColorScale {
+  id: number;
+  color: string;
+  min_visits: number;
+  max_visits: number | null;
+}
+
+type ColorFilter = 'all' | 'yellow' | 'orange' | 'green';
+
 export default function DailyReportPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [doctorVisits, setDoctorVisits] = useState<DoctorVisit[]>([]);
   const [pharmacyVisits, setPharmacyVisits] = useState<PharmacyVisit[]>([]);
+  const [colorScales, setColorScales] = useState<ColorScale[]>([]);
+
+  // Manager view states
+  const [employeeReports, setEmployeeReports] = useState<EmployeeDailyReport[]>([]);
+  const [colorFilter, setColorFilter] = useState<ColorFilter>('all');
+  const [expandedEmployees, setExpandedEmployees] = useState<Set<number>>(new Set());
   const [showDoctorModal, setShowDoctorModal] = useState(false);
   const [showPharmacyModal, setShowPharmacyModal] = useState(false);
   const [doctorForm, setDoctorForm] = useState<DoctorVisit>({
     doctor_name: '',
     hospital_name: '',
     specialty: '',
+    supported_product: '',
     notes: ''
   });
   const [pharmacyForm, setPharmacyForm] = useState({
@@ -61,8 +86,7 @@ export default function DailyReportPage() {
   const [newPharmacyData, setNewPharmacyData] = useState({
     name: '',
     city: '',
-    district: '',
-    street: ''
+    district: ''
   });
   const [visitDetails, setVisitDetails] = useState({
     product_count: '',
@@ -78,6 +102,7 @@ export default function DailyReportPage() {
   });
 
   const today = new Date().toISOString().split('T')[0];
+  const [selectedDate, setSelectedDate] = useState<string>(today);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -86,19 +111,75 @@ export default function DailyReportPage() {
       return;
     }
     fetchData();
-  }, []);
+  }, [selectedDate]); // selectedDate değiştiğinde yeniden fetch et
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const userRes = await axios.get('/employees/me');
+      const [userRes, colorScalesRes] = await Promise.all([
+        axios.get('/employees/me'),
+        axios.get('/settings/visit-color-scales')
+      ]);
       setUser(userRes.data);
+      setColorScales(colorScalesRes.data);
 
-      const doctorRes = await axios.get(`/daily-visits/doctors?visit_date=${today}`);
-      setDoctorVisits(doctorRes.data);
+      if (userRes.data.role === 'MANAGER' || userRes.data.role === 'ADMIN') {
+        // Manager: Fetch all employees' visits
+        const employeesRes = await axios.get('/employees/');
+        const activeEmployees = employeesRes.data.filter((emp: any) => emp.is_active);
 
-      const pharmacyRes = await axios.get(`/daily-visits/pharmacies?visit_date=${today}`);
-      setPharmacyVisits(pharmacyRes.data);
+        // Sort employees: EMPLOYEE first, then MANAGER and ADMIN at the end
+        activeEmployees.sort((a: any, b: any) => {
+          const aIsManagerOrAdmin = a.role === 'MANAGER' || a.role === 'ADMIN';
+          const bIsManagerOrAdmin = b.role === 'MANAGER' || b.role === 'ADMIN';
+
+          if (aIsManagerOrAdmin && !bIsManagerOrAdmin) return 1;
+          if (!aIsManagerOrAdmin && bIsManagerOrAdmin) return -1;
+          return 0;
+        });
+
+        const [doctorVisitsRes, pharmacyVisitsRes] = await Promise.all([
+          axios.get('/daily-visits/doctors', { params: { visit_date: selectedDate, limit: 1000 } }),
+          axios.get('/daily-visits/pharmacies', { params: { visit_date: selectedDate, limit: 1000 } })
+        ]);
+
+        // Group by employee
+        const employeeReportsMap: { [key: number]: EmployeeDailyReport } = {};
+
+        activeEmployees.forEach((emp: any) => {
+          employeeReportsMap[emp.id] = {
+            employee_id: emp.id,
+            employee_name: emp.full_name,
+            doctor_visits: [],
+            pharmacy_visits: []
+          };
+        });
+
+        // Add doctor visits
+        doctorVisitsRes.data.forEach((visit: any) => {
+          if (employeeReportsMap[visit.employee_id]) {
+            employeeReportsMap[visit.employee_id].doctor_visits.push(visit);
+          }
+        });
+
+        // Add pharmacy visits
+        pharmacyVisitsRes.data.forEach((visit: any) => {
+          if (employeeReportsMap[visit.employee_id]) {
+            employeeReportsMap[visit.employee_id].pharmacy_visits.push(visit);
+          }
+        });
+
+        // Convert to array and maintain the sort order (EMPLOYEE first, MANAGER/ADMIN last)
+        const sortedReports = activeEmployees.map((emp: any) => employeeReportsMap[emp.id]);
+        setEmployeeReports(sortedReports);
+      } else {
+        // Regular employee: Fetch own visits
+        const doctorRes = await axios.get('/daily-visits/doctors', { params: { visit_date: selectedDate } });
+        setDoctorVisits(doctorRes.data);
+
+        const pharmacyRes = await axios.get('/daily-visits/pharmacies', { params: { visit_date: selectedDate } });
+        setPharmacyVisits(pharmacyRes.data);
+      }
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -115,11 +196,11 @@ export default function DailyReportPage() {
     try {
       await axios.post('/daily-visits/doctors', {
         ...doctorForm,
-        visit_date: today
+        visit_date: selectedDate
       });
 
       setShowDoctorModal(false);
-      setDoctorForm({ doctor_name: '', hospital_name: '', specialty: '', notes: '' });
+      setDoctorForm({ doctor_name: '', hospital_name: '', specialty: '', supported_product: '', notes: '' });
       fetchData();
       alert('Hekim ziyareti başarıyla eklendi!');
     } catch (error: any) {
@@ -161,8 +242,8 @@ export default function DailyReportPage() {
       return forbidden.some(word => lower.includes(word));
     };
 
-    if (checkForbidden(newPharmacyData.city) || checkForbidden(newPharmacyData.district) || checkForbidden(newPharmacyData.street)) {
-      alert('Lütfen "mah.", "sk." gibi kısaltmalar kullanmayın. Sadece semt ve sokak adını yazın.');
+    if (checkForbidden(newPharmacyData.city) || checkForbidden(newPharmacyData.district)) {
+      alert('Lütfen "mah.", "sk." gibi kısaltmalar kullanmayın. Sadece şehir ve semt adını yazın.');
       return;
     }
 
@@ -174,8 +255,7 @@ export default function DailyReportPage() {
         name: res.data.name,
         city: res.data.city,
         district: res.data.district,
-        street: res.data.street,
-        address_display: [res.data.district, res.data.street, res.data.city].filter(Boolean).join(' / '),
+        address_display: [res.data.district, res.data.city].filter(Boolean).join(' / '),
         is_approved: false
       });
       setShowNewPharmacyForm(false);
@@ -197,7 +277,7 @@ export default function DailyReportPage() {
         product_count: parseInt(visitDetails.product_count as string, 10) || 0,
         mf_count: parseInt(visitDetails.mf_count as string, 10) || 0,
         notes: visitDetails.notes,
-        visit_date: today
+        visit_date: selectedDate
       });
 
       setShowPharmacyModal(false);
@@ -205,7 +285,7 @@ export default function DailyReportPage() {
       setSelectedPharmacy(null);
       setPharmacySearchResults([]);
       setShowNewPharmacyForm(false);
-      setNewPharmacyData({ name: '', city: '', district: '', street: '' });
+      setNewPharmacyData({ name: '', city: '', district: '' });
       setVisitDetails({ product_count: '', mf_count: '', notes: '' });
       fetchData();
       alert('Eczane ziyareti başarıyla eklendi!');
@@ -256,7 +336,7 @@ export default function DailyReportPage() {
         product_count: parseInt(editPharmacyVisitForm.product_count as string, 10) || 0,
         mf_count: parseInt(editPharmacyVisitForm.mf_count as string, 10) || 0,
         notes: editPharmacyVisitForm.notes,
-        visit_date: today
+        visit_date: selectedDate
       });
       setShowEditPharmacyVisitModal(false);
       setEditingPharmacyVisit(null);
@@ -268,13 +348,96 @@ export default function DailyReportPage() {
     }
   };
 
-  const getColorCode = (count: number) => {
-    if (count >= 20) return { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400', border: 'border-green-300 dark:border-green-700' };
-    if (count >= 15) return { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-400', border: 'border-orange-300 dark:border-orange-700' };
-    return { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400', border: 'border-yellow-300 dark:border-yellow-700' };
+  // Helper functions for color coding (dynamic based on colorScales from API)
+  const getColorClass = (doctorVisits: number) => {
+    const sortedScales = [...colorScales].sort((a, b) => a.min_visits - b.min_visits);
+
+    for (const scale of sortedScales) {
+      if (scale.max_visits === null) {
+        if (doctorVisits >= scale.min_visits) {
+          return getColorClassForColor(scale.color);
+        }
+      } else {
+        if (doctorVisits >= scale.min_visits && doctorVisits <= scale.max_visits) {
+          return getColorClassForColor(scale.color);
+        }
+      }
+    }
+
+    return 'bg-gray-100 dark:bg-gray-900/30 border-gray-500 text-gray-900 dark:text-gray-200';
   };
 
-  const colorCode = getColorCode(doctorVisits.length);
+  const getColorClassForColor = (color: string) => {
+    switch (color) {
+      case 'yellow':
+        return 'bg-yellow-100 dark:bg-yellow-900/30 border-yellow-500 text-yellow-900 dark:text-yellow-200';
+      case 'orange':
+        return 'bg-orange-200 dark:bg-orange-700/60 border-orange-600 text-orange-900 dark:text-orange-100';
+      case 'green':
+        return 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-900 dark:text-green-200';
+      default:
+        return 'bg-gray-100 dark:bg-gray-900/30 border-gray-500 text-gray-900 dark:text-gray-200';
+    }
+  };
+
+  const getColorCategory = (doctorVisits: number): ColorFilter => {
+    const sortedScales = [...colorScales].sort((a, b) => a.min_visits - b.min_visits);
+
+    for (const scale of sortedScales) {
+      if (scale.max_visits === null) {
+        if (doctorVisits >= scale.min_visits) {
+          return scale.color as ColorFilter;
+        }
+      } else {
+        if (doctorVisits >= scale.min_visits && doctorVisits <= scale.max_visits) {
+          return scale.color as ColorFilter;
+        }
+      }
+    }
+
+    return 'yellow';
+  };
+
+  const getUserColorInfo = (doctorVisits: number) => {
+    const sortedScales = [...colorScales].sort((a, b) => a.min_visits - b.min_visits);
+
+    for (const scale of sortedScales) {
+      if (scale.max_visits === null) {
+        if (doctorVisits >= scale.min_visits) {
+          return { color: scale.color, label: getColorLabel(scale.color) };
+        }
+      } else {
+        if (doctorVisits >= scale.min_visits && doctorVisits <= scale.max_visits) {
+          return { color: scale.color, label: getColorLabel(scale.color) };
+        }
+      }
+    }
+
+    return { color: 'gray', label: 'Gri' };
+  };
+
+  const getColorLabel = (color: string) => {
+    switch (color) {
+      case 'yellow': return 'Sarı';
+      case 'orange': return 'Turuncu';
+      case 'green': return 'Yeşil';
+      default: return color;
+    }
+  };
+
+  const getColorTextClass = (color: string) => {
+    switch (color) {
+      case 'yellow': return 'text-yellow-600 dark:text-yellow-400 font-bold';
+      case 'orange': return 'text-orange-600 dark:text-orange-400 font-bold';
+      case 'green': return 'text-green-600 dark:text-green-400 font-bold';
+      default: return 'text-gray-600 dark:text-gray-400 font-bold';
+    }
+  };
+
+  const filteredEmployeeReports = employeeReports.filter(report => {
+    if (colorFilter === 'all') return true;
+    return getColorCategory(report.doctor_visits.length) === colorFilter;
+  });
 
   if (loading) {
     return (
@@ -284,20 +447,239 @@ export default function DailyReportPage() {
     );
   }
 
+  // Manager View
+  if (user?.role === 'MANAGER' || user?.role === 'ADMIN') {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Günlük Rapor</h1>
+          <p className="text-gray-600 dark:text-gray-300">Çalışanların günlük ziyaret detayları</p>
+        </div>
+
+        {/* Tarih Seçici ve Filtre */}
+        <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-4">
+          <DateSelector
+            value={selectedDate}
+            onChange={setSelectedDate}
+            max={today}
+          />
+          <div className="flex items-center gap-3 pt-4 border-t dark:border-gray-700">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-200">Renk Filtrele:</label>
+            <select
+              value={colorFilter}
+              onChange={(e) => setColorFilter(e.target.value as ColorFilter)}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+            >
+              <option value="all">Tümü</option>
+              <option value="yellow">Sarı (0-14)</option>
+              <option value="orange">Turuncu (15-19)</option>
+              <option value="green">Yeşil (20+)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Employee Reports */}
+        <div className="space-y-6">
+          {filteredEmployeeReports.map((report) => (
+            <div key={report.employee_id} className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+              {/* Employee Name Header - Colored + Clickable */}
+              <div
+                className={`p-4 ${getColorClass(report.doctor_visits.length)} cursor-pointer hover:opacity-90 transition-opacity`}
+                onClick={() => {
+                  const newExpanded = new Set(expandedEmployees);
+                  if (newExpanded.has(report.employee_id)) {
+                    newExpanded.delete(report.employee_id);
+                  } else {
+                    newExpanded.add(report.employee_id);
+                  }
+                  setExpandedEmployees(newExpanded);
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {expandedEmployees.has(report.employee_id) ? (
+                      <ChevronDown className="w-5 h-5" />
+                    ) : (
+                      <ChevronRight className="w-5 h-5" />
+                    )}
+                    <h3 className="text-xl font-bold">{report.employee_name}</h3>
+                  </div>
+                  <div className="text-sm font-semibold">
+                    {report.doctor_visits.length} Hekim | {report.pharmacy_visits.length} Eczane
+                  </div>
+                </div>
+              </div>
+
+              {/* Visit Details - Collapsible */}
+              {expandedEmployees.has(report.employee_id) && (
+                <div className="p-6 space-y-6">
+                {/* Hekim Ziyaretleri */}
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                    <Stethoscope className="w-5 h-5 text-blue-600" />
+                    Hekim Ziyaretleri
+                  </h4>
+                  {report.doctor_visits.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full border-collapse">
+                        <thead>
+                          <tr className="bg-blue-100 dark:bg-blue-900/40">
+                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Hastane</th>
+                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Bölüm</th>
+                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Hekim</th>
+                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Desteklenen Ürün</th>
+                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Notlar</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {report.doctor_visits.map((visit, idx) => (
+                            <tr key={idx} className="border-b border-blue-100 dark:border-blue-900/30 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+                              <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{visit.hospital_name}</td>
+                              <td className="px-4 py-3 text-sm text-blue-600 dark:text-blue-400">{visit.specialty || '-'}</td>
+                              <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{visit.doctor_name}</td>
+                              <td className="px-4 py-3 text-sm text-green-600 dark:text-green-400 font-medium">{visit.supported_product || '-'}</td>
+                              <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate" title={visit.notes}>{visit.notes || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Hekim ziyareti yok</p>
+                  )}
+                </div>
+
+                {/* Eczane Ziyaretleri */}
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                    <Building className="w-5 h-5 text-green-600" />
+                    Eczane Ziyaretleri
+                  </h4>
+                  {report.pharmacy_visits.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full border-collapse">
+                        <thead>
+                          <tr className="bg-green-100 dark:bg-green-900/40">
+                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">Eczane Adı</th>
+                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">Satılan Ürün Sayısı</th>
+                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">MF Sayısı</th>
+                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">Notlar</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {report.pharmacy_visits.map((visit, idx) => (
+                            <tr key={idx} className="border-b border-green-100 dark:border-green-900/30 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors">
+                              <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{visit.pharmacy_name || 'Eczane'}</td>
+                              <td className="px-4 py-3 text-sm text-purple-600 dark:text-purple-400 font-medium">{visit.product_count}</td>
+                              <td className="px-4 py-3 text-sm text-orange-600 dark:text-orange-400 font-medium">{visit.mf_count}</td>
+                              <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate" title={visit.notes}>{visit.notes || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Eczane ziyareti yok</p>
+                  )}
+                </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {filteredEmployeeReports.length === 0 && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">
+            <Stethoscope className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-500 dark:text-gray-400 text-lg">
+              {colorFilter === 'all' ? 'Seçili tarih için veri bulunmuyor' : 'Seçili filtre için veri bulunmuyor'}
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Regular Employee View
+
   return <>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className={`mb-6 p-6 rounded-lg border-2 ${colorCode.bg} ${colorCode.border}`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className={`text-2xl font-bold ${colorCode.text}`}>Bugünün Özeti</h2>
-              <p className="text-gray-600 dark:text-gray-300 mt-1">{new Date(today).toLocaleDateString('tr-TR')}</p>
+        {/* Tarih Seçici */}
+        <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <DateSelector
+            value={selectedDate}
+            onChange={setSelectedDate}
+            max={today}
+          />
+        </div>
+
+        <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden border-2 border-blue-300 dark:border-blue-700">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/40 dark:to-blue-800/40 px-6 py-4 border-b-2 border-blue-300 dark:border-blue-700">
+            <h2 className="text-2xl font-bold text-blue-700 dark:text-blue-400">Seçilen Günün Özeti</h2>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">{new Date(selectedDate).toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+          </div>
+
+          {/* Stats Grid */}
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              {/* Hekim Ziyaretleri */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border-2 border-blue-200 dark:border-blue-800">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Hekim Ziyareti</div>
+                    <div className="text-4xl font-bold text-blue-700 dark:text-blue-400 mt-1">{doctorVisits.length}</div>
+                  </div>
+                  <Stethoscope className="w-12 h-12 text-blue-400 dark:text-blue-600" />
+                </div>
+              </div>
+
+              {/* Eczane Ziyaretleri */}
+              <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border-2 border-green-200 dark:border-green-800">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Eczane Ziyareti</div>
+                    <div className="text-4xl font-bold text-green-700 dark:text-green-400 mt-1">{pharmacyVisits.length}</div>
+                  </div>
+                  <Pill className="w-12 h-12 text-green-400 dark:text-green-600" />
+                </div>
+              </div>
+
+              {/* Renk Kodu */}
+              <div className={`${getColorClass(doctorVisits.length)} rounded-lg p-4 border-2`}>
+                <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Renk Kodunuz</div>
+                <div className="text-3xl font-bold">
+                  <span className={getUserColorInfo(doctorVisits.length).color === 'yellow' ? 'text-yellow-600 dark:text-yellow-400' :
+                                  getUserColorInfo(doctorVisits.length).color === 'orange' ? 'text-orange-600 dark:text-orange-400' :
+                                  getUserColorInfo(doctorVisits.length).color === 'green' ? 'text-green-600 dark:text-green-400' :
+                                  'text-gray-600 dark:text-gray-400'}>
+                    {getUserColorInfo(doctorVisits.length).label}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="text-right">
-              <div className={`text-4xl font-bold ${colorCode.text}`}>{doctorVisits.length}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-300">Hekim Ziyareti</div>
-              <div className={`text-2xl font-bold ${colorCode.text} mt-2`}>{pharmacyVisits.length}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-300">Eczane Ziyareti</div>
-            </div>
+
+            {/* Renk Kodları Açıklaması (Dinamik) */}
+            {colorScales.length > 0 && (
+              <div className="bg-gray-50 dark:bg-gray-900/30 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Renk Kodları</div>
+                <div className="flex flex-wrap gap-3">
+                  {colorScales
+                    .sort((a, b) => a.min_visits - b.min_visits)
+                    .map((scale) => (
+                      <div key={scale.id} className="flex items-center gap-1.5">
+                        <div className={`w-5 h-5 rounded ${getColorClassForColor(scale.color)} border`}></div>
+                        <span className="text-xs text-gray-700 dark:text-gray-300">
+                          {scale.max_visits !== null
+                            ? `${scale.min_visits}-${scale.max_visits}`
+                            : `${scale.min_visits}+`
+                          }
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -323,36 +705,48 @@ export default function DailyReportPage() {
             <Stethoscope className="w-6 h-6 text-blue-600" />
             Hekim Ziyaretleri ({doctorVisits.length})
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {doctorVisits.map((visit) => (
-              <div key={visit.id} className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
-                <div className="flex justify-between items-start mb-2">
-                  <h4 className="font-semibold text-gray-900 dark:text-white">{visit.doctor_name}</h4>
-                  <button
-                    onClick={() => visit.id && handleDeleteDoctor(visit.id)}
-                    className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 p-1 rounded"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 mb-1">
-                  <Building className="w-4 h-4" />
-                  {visit.hospital_name}
-                </div>
-                {visit.specialty && (
-                  <div className="text-sm text-gray-500 dark:text-gray-400">Branş: {visit.specialty}</div>
-                )}
-                {visit.notes && (
-                  <div className="text-sm text-gray-500 dark:text-gray-400 mt-2">{visit.notes}</div>
-                )}
+          {doctorVisits.length > 0 ? (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full border-collapse">
+                  <thead>
+                    <tr className="bg-blue-100 dark:bg-blue-900/40">
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Hastane</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Bölüm</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Hekim</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Desteklenen Ürün</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Notlar</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">İşlem</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {doctorVisits.map((visit) => (
+                      <tr key={visit.id} className="border-b border-blue-100 dark:border-blue-900/30 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+                        <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{visit.hospital_name}</td>
+                        <td className="px-4 py-3 text-sm text-blue-600 dark:text-blue-400">{visit.specialty || '-'}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{visit.doctor_name}</td>
+                        <td className="px-4 py-3 text-sm text-green-600 dark:text-green-400 font-medium">{visit.supported_product || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate" title={visit.notes}>{visit.notes || '-'}</td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => visit.id && handleDeleteDoctor(visit.id)}
+                            className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded inline-flex items-center justify-center"
+                            title="Sil"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            ))}
-            {doctorVisits.length === 0 && (
-              <div className="col-span-full text-center text-gray-500 dark:text-gray-400 py-8">
-                Henüz hekim ziyareti eklenmemiş
-              </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center text-gray-500 dark:text-gray-400">
+              Henüz hekim ziyareti eklenmemiş
+            </div>
+          )}
         </div>
 
         <div>
@@ -360,51 +754,57 @@ export default function DailyReportPage() {
             <Pill className="w-6 h-6 text-green-600" />
             Eczane Ziyaretleri ({pharmacyVisits.length})
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {pharmacyVisits.map((visit) => (
-              <div key={visit.id} className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
-                <div className="flex justify-between items-start mb-3">
-                  <h4 className="font-semibold text-gray-900 dark:text-white">{visit.pharmacy_name}</h4>
-                  <div className="flex gap-2">
-                    {(user?.role === 'MANAGER' || user?.role === 'ADMIN') && (
-                      <button
-                        onClick={() => handleEditPharmacyVisit(visit)}
-                        className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 p-1 rounded"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => visit.id && handleDeletePharmacy(visit.id)}
-                      className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 p-1 rounded"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-400">Satılan Ürün:</span>
-                    <span className="font-semibold text-blue-600 dark:text-blue-400">{visit.product_count}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-400">Verilen MF:</span>
-                    <span className="font-semibold text-green-600 dark:text-green-400">{visit.mf_count}</span>
-                  </div>
-                  {visit.notes && (
-                    <div className="text-sm text-gray-500 dark:text-gray-400 mt-2 pt-2 border-t dark:border-gray-600">
-                      <span className="font-medium">Not:</span> {visit.notes}
-                    </div>
-                  )}
-                </div>
+          {pharmacyVisits.length > 0 ? (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full border-collapse">
+                  <thead>
+                    <tr className="bg-green-100 dark:bg-green-900/40">
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">Eczane Adı</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">Satılan Ürün Sayısı</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">MF Sayısı</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">Notlar</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">İşlem</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pharmacyVisits.map((visit) => (
+                      <tr key={visit.id} className="border-b border-green-100 dark:border-green-900/30 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors">
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{visit.pharmacy_name}</td>
+                        <td className="px-4 py-3 text-sm text-purple-600 dark:text-purple-400 font-medium">{visit.product_count}</td>
+                        <td className="px-4 py-3 text-sm text-orange-600 dark:text-orange-400 font-medium">{visit.mf_count}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate" title={visit.notes}>{visit.notes || '-'}</td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex gap-2 justify-center">
+                            {(user?.role === 'MANAGER' || user?.role === 'ADMIN') && (
+                              <button
+                                onClick={() => handleEditPharmacyVisit(visit)}
+                                className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 p-2 rounded inline-flex items-center justify-center"
+                                title="Düzenle"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => visit.id && handleDeletePharmacy(visit.id)}
+                              className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded inline-flex items-center justify-center"
+                              title="Sil"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            ))}
-            {pharmacyVisits.length === 0 && (
-              <div className="col-span-full text-center text-gray-500 dark:text-gray-400 py-8">
-                Henüz eczane ziyareti eklenmemiş
-              </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center text-gray-500 dark:text-gray-400">
+              Henüz eczane ziyareti eklenmemiş
+            </div>
+          )}
         </div>
 
       {/* Doctor Modal */}
@@ -437,6 +837,13 @@ export default function DailyReportPage() {
                 placeholder="Branş"
                 value={doctorForm.specialty}
                 onChange={(e) => setDoctorForm({ ...doctorForm, specialty: e.target.value })}
+                className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:text-white"
+              />
+              <input
+                type="text"
+                placeholder="Desteklenen Ürün"
+                value={doctorForm.supported_product}
+                onChange={(e) => setDoctorForm({ ...doctorForm, supported_product: e.target.value })}
                 className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:text-white"
               />
               <textarea
@@ -654,13 +1061,6 @@ export default function DailyReportPage() {
                     placeholder="Semt/İlçe (örn: kadıköy)"
                     value={newPharmacyData.district}
                     onChange={(e) => setNewPharmacyData({ ...newPharmacyData, district: e.target.value.toLowerCase() })}
-                    className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Sokak (örn: bahariye)"
-                    value={newPharmacyData.street}
-                    onChange={(e) => setNewPharmacyData({ ...newPharmacyData, street: e.target.value.toLowerCase() })}
                     className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:text-white dark:border-gray-600"
                   />
                   <button

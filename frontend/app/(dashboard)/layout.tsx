@@ -13,7 +13,7 @@ import {
   FileText,
   Calendar,
   BarChart3,
-  Users,
+  Settings,
   ClipboardList
 } from 'lucide-react'
 
@@ -58,10 +58,10 @@ export default function DashboardLayout({
     { label: 'Dashboard', path: '/', icon: LayoutDashboard },
     { label: 'Eczaneler', path: '/pharmacies', icon: Building },
     { label: 'Günlük Rapor', path: '/daily-report', icon: FileText },
+    { label: 'Durum Raporu', path: '/status-report', icon: ClipboardList, roles: ['MANAGER', 'ADMIN'] },
     { label: 'Haftalık Program', path: '/weekly-program', icon: Calendar },
     { label: 'Raporlar', path: '/reports', icon: BarChart3, roles: ['MANAGER', 'ADMIN'] },
-    { label: 'Durum Raporu', path: '/status-report', icon: ClipboardList, roles: ['MANAGER', 'ADMIN'] },
-    { label: 'Kullanıcılar', path: '/users', icon: Users, roles: ['MANAGER', 'ADMIN'] },
+    { label: 'Ayarlar', path: '/settings', icon: Settings, roles: ['MANAGER', 'ADMIN'] },
   ]
 
   const handleLogout = () => {

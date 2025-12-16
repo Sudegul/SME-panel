@@ -16,6 +16,7 @@ class DoctorVisit(Base):
     doctor_name = Column(String, nullable=False)  # Doktor adı
     hospital_name = Column(String, nullable=False)  # Hastane adı
     specialty = Column(String, nullable=True)  # Branş
+    supported_product = Column(String, nullable=True)  # Desteklenen ürün
     notes = Column(Text, nullable=True)  # Notlar
 
     # Ziyaret detayları

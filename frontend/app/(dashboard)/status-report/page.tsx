@@ -3,41 +3,32 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from '@/lib/axios';
-import { Calendar, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Calendar, Building, UserRound, Package, Gift } from 'lucide-react';
+import DateSelector from '@/components/DateSelector';
 
-interface DoctorComparisonItem {
-  hospital_name: string;
-  doctor_name: string;
-  planned: boolean;
-  visited: boolean;
-  status: string;
-}
-
-interface DayStatusReport {
-  date: string;
-  day_name: string;
-  doctors: DoctorComparisonItem[];
-}
-
-interface WeeklyStatusReport {
+interface EmployeeVisitStats {
   employee_id: number;
   employee_name: string;
-  week_start: string;
-  week_end: string;
-  total_planned: number;
-  total_visited: number;
-  total_missed: number;
-  completion_rate: number;
-  days: DayStatusReport[];
+  doctor_visits: number;
+  pharmacy_visits: number;
+  product_count: number;
+  mf_count: number;
+}
+
+interface ColorScale {
+  id: number;
+  color: string;
+  min_visits: number;
+  max_visits: number | null;
 }
 
 export default function StatusReportPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [reports, setReports] = useState<WeeklyStatusReport[]>([]);
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
+  const [stats, setStats] = useState<EmployeeVisitStats[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [colorScales, setColorScales] = useState<ColorScale[]>([]);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -46,13 +37,17 @@ export default function StatusReportPage() {
       return;
     }
     fetchData();
-  }, []);
+  }, [selectedDate]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const userRes = await axios.get('/employees/me');
+      const [userRes, colorScalesRes] = await Promise.all([
+        axios.get('/employees/me'),
+        axios.get('/settings/visit-color-scales')
+      ]);
       setUser(userRes.data);
+      setColorScales(colorScalesRes.data);
 
       // Check if user is manager/admin
       if (userRes.data.role !== 'MANAGER' && userRes.data.role !== 'ADMIN') {
@@ -60,13 +55,59 @@ export default function StatusReportPage() {
         return;
       }
 
-      // Fetch status reports
-      const reportsRes = await axios.get('/status-reports/weekly');
-      setReports(reportsRes.data);
-
-      // Fetch employees
+      // Fetch all employees
       const employeesRes = await axios.get('/employees/');
-      setEmployees(employeesRes.data.filter((emp: any) => emp.is_active));
+      const activeEmployees = employeesRes.data.filter((emp: any) => emp.is_active);
+
+      // Sort employees: EMPLOYEE first, then MANAGER and ADMIN at the end
+      activeEmployees.sort((a: any, b: any) => {
+        const aIsManagerOrAdmin = a.role === 'MANAGER' || a.role === 'ADMIN';
+        const bIsManagerOrAdmin = b.role === 'MANAGER' || b.role === 'ADMIN';
+
+        if (aIsManagerOrAdmin && !bIsManagerOrAdmin) return 1;
+        if (!aIsManagerOrAdmin && bIsManagerOrAdmin) return -1;
+        return 0;
+      });
+
+      // Fetch visits for selected date and calculate stats per employee
+      const [doctorVisitsRes, pharmacyVisitsRes] = await Promise.all([
+        axios.get('/daily-visits/doctors', { params: { visit_date: selectedDate, limit: 1000 } }),
+        axios.get('/daily-visits/pharmacies', { params: { visit_date: selectedDate, limit: 1000 } })
+      ]);
+
+      // Group visits by employee
+      const employeeStats: { [key: number]: EmployeeVisitStats } = {};
+
+      activeEmployees.forEach((emp: any) => {
+        employeeStats[emp.id] = {
+          employee_id: emp.id,
+          employee_name: emp.full_name,
+          doctor_visits: 0,
+          pharmacy_visits: 0,
+          product_count: 0,
+          mf_count: 0
+        };
+      });
+
+      // Count doctor visits
+      doctorVisitsRes.data.forEach((visit: any) => {
+        if (employeeStats[visit.employee_id]) {
+          employeeStats[visit.employee_id].doctor_visits++;
+        }
+      });
+
+      // Count pharmacy visits and sum product/mf counts
+      pharmacyVisitsRes.data.forEach((visit: any) => {
+        if (employeeStats[visit.employee_id]) {
+          employeeStats[visit.employee_id].pharmacy_visits++;
+          employeeStats[visit.employee_id].product_count += visit.product_count || 0;
+          employeeStats[visit.employee_id].mf_count += visit.mf_count || 0;
+        }
+      });
+
+      // Convert to array and maintain the sort order (EMPLOYEE first, MANAGER/ADMIN last)
+      const sortedStats = activeEmployees.map((emp: any) => employeeStats[emp.id]);
+      setStats(sortedStats);
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -74,9 +115,41 @@ export default function StatusReportPage() {
     }
   };
 
-  const filteredReports = selectedEmployee === 'all'
-    ? reports
-    : reports.filter(r => r.employee_id === parseInt(selectedEmployee));
+  // Get color based on doctor visit count (dynamic from backend)
+  const getColorClass = (doctorVisits: number) => {
+    // Find the matching color scale
+    const sortedScales = [...colorScales].sort((a, b) => a.min_visits - b.min_visits);
+
+    for (const scale of sortedScales) {
+      if (scale.max_visits === null) {
+        // Last scale (unlimited)
+        if (doctorVisits >= scale.min_visits) {
+          return getColorClassForColor(scale.color);
+        }
+      } else {
+        // Range scale
+        if (doctorVisits >= scale.min_visits && doctorVisits <= scale.max_visits) {
+          return getColorClassForColor(scale.color);
+        }
+      }
+    }
+
+    // Fallback (should not happen)
+    return 'bg-gray-100 dark:bg-gray-900/30 border-gray-500 text-gray-900 dark:text-gray-200';
+  };
+
+  const getColorClassForColor = (color: string) => {
+    switch (color) {
+      case 'yellow':
+        return 'bg-yellow-100 dark:bg-yellow-900/30 border-yellow-500 text-yellow-900 dark:text-yellow-200';
+      case 'orange':
+        return 'bg-orange-200 dark:bg-orange-700/60 border-orange-600 text-orange-900 dark:text-orange-100';
+      case 'green':
+        return 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-900 dark:text-green-200';
+      default:
+        return 'bg-gray-100 dark:bg-gray-900/30 border-gray-500 text-gray-900 dark:text-gray-200';
+    }
+  };
 
   if (loading) {
     return (
@@ -86,118 +159,102 @@ export default function StatusReportPage() {
     );
   }
 
-  return <>
+  return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">Haftalık Durum Raporu</h1>
-        <p className="text-gray-600 dark:text-gray-300 mb-6">Planlanan hekim ziyaretleri ile gerçekleşen ziyaretlerin karşılaştırması</p>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Durum Raporu</h1>
+        <p className="text-gray-600 dark:text-gray-300">Çalışanların günlük ziyaret durumu</p>
+      </div>
 
-        {/* Filter */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mr-4">Çalışan Filtrele:</label>
-          <select
-            value={selectedEmployee}
-            onChange={(e) => setSelectedEmployee(e.target.value)}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+      {/* Date Selector */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+        <DateSelector
+          value={selectedDate}
+          onChange={setSelectedDate}
+        />
+      </div>
+
+      {/* Color Scale Legend - Dynamic */}
+      {colorScales.length > 0 && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 p-4 mb-6 rounded-lg">
+          <div className="text-xs font-semibold text-blue-900 dark:text-blue-200 mb-2">Renk Kodları (Hekim Ziyaretleri)</div>
+          <div className="flex flex-wrap gap-3">
+            {colorScales
+              .sort((a, b) => a.min_visits - b.min_visits)
+              .map((scale) => (
+                <div key={scale.id} className="flex items-center gap-1.5">
+                  <div className={`w-5 h-5 rounded ${getColorClass(scale.min_visits)} border`}></div>
+                  <span className="text-xs font-medium text-gray-900 dark:text-gray-100">
+                    {scale.max_visits !== null
+                      ? `${scale.min_visits}-${scale.max_visits}`
+                      : `${scale.min_visits}+`
+                    }
+                  </span>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* Employee Stats Table */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {stats.map((stat) => (
+          <div
+            key={stat.employee_id}
+            className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden border-2"
           >
-            <option value="all">Tüm Çalışanlar</option>
-            {employees.map((emp) => (
-              <option key={emp.id} value={emp.id}>{emp.full_name}</option>
-            ))}
-          </select>
-        </div>
+            {/* Employee Name - Colored based on doctor visits */}
+            <div className={`p-4 border-b-2 ${getColorClass(stat.doctor_visits)}`}>
+              <div className="flex items-center gap-2">
+                <UserRound className="w-5 h-5" />
+                <h3 className="font-bold text-lg">{stat.employee_name}</h3>
+              </div>
+            </div>
 
-        {/* Reports */}
-        <div className="space-y-6">
-          {filteredReports.map((report) => (
-            <div key={report.employee_id} className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-              {/* Header */}
-              <div className="p-6 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-gray-700 dark:to-gray-800 border-b dark:border-gray-700">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">{report.employee_name}</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  {new Date(report.week_start).toLocaleDateString('tr-TR')} - {new Date(report.week_end).toLocaleDateString('tr-TR')}
-                </p>
-                <div className="mt-4 flex gap-6">
-                  <div>
-                    <div className="text-2xl font-bold text-blue-600">{report.total_planned}</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-300">Planlanan</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-green-600">{report.total_visited}</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-300">Gerçekleşen</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-red-600">{report.total_missed}</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-300">Kaçırılan</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-purple-600">{report.completion_rate}%</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-300">Tamamlanma</div>
-                  </div>
+            {/* Visit Stats */}
+            <div className="p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <UserRound className="w-5 h-5 text-blue-600 mt-0.5" />
+                <div className="flex-1">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Hekim Ziyaretleri</div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">{stat.doctor_visits}</div>
                 </div>
               </div>
 
-              {/* Days */}
-              <div className="p-6">
-                <div className="space-y-4">
-                  {report.days.map((day, idx) => (
-                    <div key={idx} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Calendar className="w-5 h-5 text-blue-600" />
-                        <h4 className="font-semibold text-gray-900 dark:text-white">
-                          {day.day_name} - {new Date(day.date).toLocaleDateString('tr-TR')}
-                        </h4>
-                      </div>
+              <div className="flex items-start gap-3">
+                <Building className="w-5 h-5 text-green-600 mt-0.5" />
+                <div className="flex-1">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Eczane Ziyaretleri</div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">{stat.pharmacy_visits}</div>
+                </div>
+              </div>
 
-                      <div className="space-y-2">
-                        {day.doctors.map((doctor, docIdx) => (
-                          <div
-                            key={docIdx}
-                            className={`flex items-start gap-3 p-3 rounded-lg ${
-                              doctor.status === 'completed'
-                                ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
-                                : doctor.status === 'missed'
-                                ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
-                                : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
-                            }`}
-                          >
-                            {doctor.status === 'completed' && <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />}
-                            {doctor.status === 'missed' && <XCircle className="w-5 h-5 text-red-600 mt-0.5" />}
-                            {doctor.status === 'extra' && <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />}
+              <div className="flex items-start gap-3">
+                <Package className="w-5 h-5 text-purple-600 mt-0.5" />
+                <div className="flex-1">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Satılan Ürün</div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">{stat.product_count}</div>
+                </div>
+              </div>
 
-                            <div className="flex-1">
-                              <div className="font-medium text-gray-900 dark:text-white">{doctor.doctor_name}</div>
-                              <div className="text-sm text-gray-600 dark:text-gray-300">{doctor.hospital_name}</div>
-                              {doctor.status === 'completed' && (
-                                <div className="text-xs text-green-600 dark:text-green-400 mt-1">✓ Ziyaret gerçekleşti</div>
-                              )}
-                              {doctor.status === 'missed' && (
-                                <div className="text-xs text-red-600 dark:text-red-400 mt-1">✗ Ziyaret gerçekleşmedi</div>
-                              )}
-                              {doctor.status === 'extra' && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">+ Planlanmamış ziyaret</div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-
-                        {day.doctors.length === 0 && (
-                          <p className="text-center text-gray-500 dark:text-gray-400 text-sm py-2">Bu gün için ziyaret planlanmamış</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+              <div className="flex items-start gap-3">
+                <Gift className="w-5 h-5 text-orange-600 mt-0.5" />
+                <div className="flex-1">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">MF Sayısı</div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">{stat.mf_count}</div>
                 </div>
               </div>
             </div>
-          ))}
+          </div>
+        ))}
+      </div>
 
-          {filteredReports.length === 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">
-              <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500 dark:text-gray-400 text-lg">Henüz durum raporu bulunmuyor</p>
-            </div>
-          )}
+      {stats.length === 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">
+          <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-500 dark:text-gray-400 text-lg">Seçili tarih için veri bulunmuyor</p>
         </div>
+      )}
     </div>
-  </>;
+  );
 }

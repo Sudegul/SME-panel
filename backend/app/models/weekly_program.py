@@ -14,7 +14,7 @@ class WeeklyProgram(Base):
     week_start = Column(Date, nullable=False, index=True)  # Haftanın ilk günü (Pazartesi)
     week_end = Column(Date, nullable=False)  # Haftanın son günü (Pazar)
 
-    # Haftalık program JSON formatında: {day: "2025-12-08", day_name: "Pazartesi", visits: [{hospital: "...", doctors: ["...", "..."]}]}
+    # Haftalık program JSON formatında: {day: "2025-12-08", day_name: "Pazartesi", visits: [{hospital_name: "..."}]}
     days_json = Column(JSONB, nullable=False)
 
     submitted = Column(Boolean, default=True)
