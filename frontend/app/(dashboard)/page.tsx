@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from '@/lib/axios';
 import { Star, TrendingUp, Users, Package } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 interface DashboardStats {
   period: { start_date: string; end_date: string };
@@ -20,6 +20,10 @@ export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [visitStats, setVisitStats] = useState<DashboardStats | null>(null);
   const [salesStats, setSalesStats] = useState<DashboardStats | null>(null);
+  const [weekStar, setWeekStar] = useState<any>(null);
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [doctorPieData, setDoctorPieData] = useState<any[]>([]);
+  const [pharmacyPieData, setPharmacyPieData] = useState<any[]>([]);
   const [period, setPeriod] = useState<'week' | 'month' | 'year'>('month');
   const [visitPeriod, setVisitPeriod] = useState<'today' | 'this-week' | 'last-week' | 'this-month' | 'this-year'>('this-week');
   const [salesPeriod, setSalesPeriod] = useState<'today' | 'this-week' | 'last-week' | 'this-month' | 'this-year'>('this-month');
@@ -51,17 +55,25 @@ export default function Dashboard() {
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      const [userRes, statsRes, visitRes, salesRes] = await Promise.all([
+      const [userRes, statsRes, visitRes, salesRes, weekStarRes, chartRes, doctorPieRes, pharmacyPieRes] = await Promise.all([
         axios.get('/employees/me'),
         axios.get(`/dashboard/stats?period=${period}`),
         axios.get(`/dashboard/stats?period=week`),
         axios.get(`/dashboard/stats?period=month`),
+        axios.get('/dashboard/week-star'),
+        axios.get(`/dashboard/chart-data?period=${period}`),
+        axios.get('/dashboard/doctor-visits-pie'),
+        axios.get('/dashboard/pharmacy-visits-pie'),
       ]);
 
       setUser(userRes.data);
       setStats(statsRes.data);
       setVisitStats(visitRes.data);
       setSalesStats(salesRes.data);
+      setWeekStar(weekStarRes.data);
+      setChartData(chartRes.data);
+      setDoctorPieData(doctorPieRes.data);
+      setPharmacyPieData(pharmacyPieRes.data);
     } catch (error: any) {
       console.error('Dashboard yüklenirken hata:', error);
       if (error.response?.status === 401) {
@@ -121,8 +133,12 @@ export default function Dashboard() {
 
   const fetchGraphStats = async () => {
     try {
-      const res = await axios.get(`/dashboard/stats?period=${period}`);
-      setStats(res.data);
+      const [statsRes, chartRes] = await Promise.all([
+        axios.get(`/dashboard/stats?period=${period}`),
+        axios.get(`/dashboard/chart-data?period=${period}`),
+      ]);
+      setStats(statsRes.data);
+      setChartData(chartRes.data);
     } catch (error: any) {
       console.error('Grafik istatistikleri yüklenirken hata:', error);
       if (error.response?.status === 401) {
@@ -140,46 +156,26 @@ export default function Dashboard() {
     );
   }
 
-  const chartData = period === 'week'
-    ? [
-        { name: 'Pzt', ziyaret: 12, satis: 8 },
-        { name: 'Sal', ziyaret: 15, satis: 10 },
-        { name: 'Çar', ziyaret: 10, satis: 7 },
-        { name: 'Per', ziyaret: 18, satis: 12 },
-        { name: 'Cum', ziyaret: 14, satis: 9 },
-      ]
-    : period === 'month'
-    ? [
-        { name: 'Hafta 1', ziyaret: 45, satis: 30 },
-        { name: 'Hafta 2', ziyaret: 52, satis: 35 },
-        { name: 'Hafta 3', ziyaret: 48, satis: 32 },
-        { name: 'Hafta 4', ziyaret: 55, satis: 40 },
-      ]
-    : [
-        { name: 'Oca', ziyaret: 180, satis: 120 }, { name: 'Şub', ziyaret: 200, satis: 135 },
-        { name: 'Mar', ziyaret: 190, satis: 128 }, { name: 'Nis', ziyaret: 210, satis: 145 },
-        { name: 'May', ziyaret: 195, satis: 132 }, { name: 'Haz', ziyaret: 220, satis: 150 },
-        { name: 'Tem', ziyaret: 205, satis: 140 }, { name: 'Ağu', ziyaret: 215, satis: 148 },
-        { name: 'Eyl', ziyaret: 225, satis: 155 }, { name: 'Eki', ziyaret: 210, satis: 143 },
-        { name: 'Kas', ziyaret: 230, satis: 160 },
-      ];
+  const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Haftanın Yıldızı */}
-        <div className="mb-8 bg-gradient-to-r from-emerald-700/85 via-teal-700/83 via-emerald-600/81 to-teal-600/80 dark:from-emerald-700/42 dark:via-teal-700/39 dark:via-emerald-600/36 dark:to-teal-600/34 rounded-xl p-8 shadow-2xl backdrop-blur-md border border-white/20 dark:border-white/10">
-          <div className="flex items-center gap-6">
-            <div className="animate-spin-slow relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-orange-300/30 to-amber-400/30 rounded-full blur-xl"></div>
-              <Star className="w-14 h-14 text-orange-300/95 fill-orange-300/95 relative z-10 drop-shadow-lg" />
-            </div>
-            <div className="text-white drop-shadow-md">
-              <h3 className="text-xl font-semibold mb-1">Haftanın Yıldızı</h3>
-              <p className="text-3xl font-bold mb-1">Ahmet Kaya</p>
-              <p className="text-sm opacity-95">245 kutu satış</p>
+        {weekStar && (
+          <div className="mb-8 bg-gradient-to-r from-emerald-700/85 via-teal-700/83 via-emerald-600/81 to-teal-600/80 dark:from-emerald-700/42 dark:via-teal-700/39 dark:via-emerald-600/36 dark:to-teal-600/34 rounded-xl p-8 shadow-2xl backdrop-blur-md border border-white/20 dark:border-white/10">
+            <div className="flex items-center gap-6">
+              <div className="animate-spin-slow relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-orange-300/30 to-amber-400/30 rounded-full blur-xl"></div>
+                <Star className="w-14 h-14 text-orange-300/95 fill-orange-300/95 relative z-10 drop-shadow-lg" />
+              </div>
+              <div className="text-white drop-shadow-md">
+                <h3 className="text-xl font-semibold mb-1">Haftanın Yıldızı</h3>
+                <p className="text-3xl font-bold mb-1">{weekStar.employee_name}</p>
+                <p className="text-sm opacity-95">{weekStar.sales_count} kutu satış</p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Grafik */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900 p-6 mb-8">
@@ -309,6 +305,69 @@ export default function Dashboard() {
                   </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">₺{stats.goal.current_sales.toLocaleString()} / ₺{stats.goal.target_sales.toLocaleString()}</p>
                 </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Pie Charts */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          {/* Doctor Visits Pie Chart */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Hekim Ziyaretleri (Çalışan Bazlı)</h3>
+            {doctorPieData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={doctorPieData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {doctorPieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-gray-400 dark:text-gray-500">
+                Veri yok
+              </div>
+            )}
+          </div>
+
+          {/* Pharmacy Visits Pie Chart */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Eczane Ziyaretleri (Çalışan Bazlı)</h3>
+            {pharmacyPieData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={pharmacyPieData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {pharmacyPieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-gray-400 dark:text-gray-500">
+                Veri yok
               </div>
             )}
           </div>

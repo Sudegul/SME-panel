@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from '@/lib/axios';
 import { Search, Filter, Edit, Check, X, Clock } from 'lucide-react';
+import CustomDateInput from '@/components/CustomDateInput';
+import { toast } from 'react-toastify';
 
 interface PharmacyVisit {
   id: number;
@@ -30,7 +32,9 @@ export default function PharmaciesPage() {
 
   // Filters
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
-  const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'week' | 'month' | 'year'>('month');
+  const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'week' | 'month' | 'year'>('day');
+  const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [searchPharmacy, setSearchPharmacy] = useState('');
   const [approvalFilter, setApprovalFilter] = useState<'all' | 'approved' | 'pending'>('all');
 
@@ -53,6 +57,32 @@ export default function PharmaciesPage() {
     pending_count: 0
   });
 
+  // Period değiştiğinde start ve end date'i güncelle
+  useEffect(() => {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+
+    if (selectedPeriod === 'day') {
+      setStartDate(todayStr);
+      setEndDate(todayStr);
+    } else if (selectedPeriod === 'week') {
+      const weekAgo = new Date(today);
+      weekAgo.setDate(today.getDate() - 7);
+      setStartDate(weekAgo.toISOString().split('T')[0]);
+      setEndDate(todayStr);
+    } else if (selectedPeriod === 'month') {
+      const monthAgo = new Date(today);
+      monthAgo.setDate(today.getDate() - 30);
+      setStartDate(monthAgo.toISOString().split('T')[0]);
+      setEndDate(todayStr);
+    } else if (selectedPeriod === 'year') {
+      const yearAgo = new Date(today);
+      yearAgo.setFullYear(today.getFullYear() - 1);
+      setStartDate(yearAgo.toISOString().split('T')[0]);
+      setEndDate(todayStr);
+    }
+  }, [selectedPeriod]);
+
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -61,7 +91,7 @@ export default function PharmaciesPage() {
     }
     fetchData();
     fetchStats();
-  }, [selectedPeriod, selectedEmployee]);
+  }, [selectedEmployee, startDate, endDate]);
 
   useEffect(() => {
     applyFilters();
@@ -77,8 +107,16 @@ export default function PharmaciesPage() {
       const employeesRes = await axios.get('/employees/');
       setEmployees(employeesRes.data.filter((emp: any) => emp.is_active));
 
-      // Fetch pharmacy visits from API
-      const visitsRes = await axios.get('/daily-visits/pharmacies');
+      // Fetch pharmacy visits from API with period and date filters
+      const params = new URLSearchParams();
+      params.append('period', selectedPeriod);
+      params.append('start_date', startDate);
+      params.append('end_date', endDate);
+      if (selectedEmployee !== 'all') {
+        params.append('employee_id', selectedEmployee);
+      }
+
+      const visitsRes = await axios.get(`/daily-visits/pharmacies?${params.toString()}`);
       const apiVisits = visitsRes.data.map((visit: any) => ({
         id: visit.id,
         pharmacy_id: visit.pharmacy_id,
@@ -107,6 +145,8 @@ export default function PharmaciesPage() {
     try {
       const params = new URLSearchParams();
       params.append('period', selectedPeriod);
+      params.append('start_date', startDate);
+      params.append('end_date', endDate);
       if (selectedEmployee !== 'all') {
         params.append('employee_id', selectedEmployee);
       }
@@ -121,7 +161,7 @@ export default function PharmaciesPage() {
   const applyFilters = () => {
     let filtered = [...visits];
 
-    // Employee filter
+    // Çalışan filtresi
     if (selectedEmployee !== 'all') {
       const selectedEmp = employees.find(e => e.id === parseInt(selectedEmployee));
       if (selectedEmp) {
@@ -168,9 +208,10 @@ export default function PharmaciesPage() {
         v.id === visitId ? { ...v, is_approved: response.data.is_approved } : v
       );
       setVisits(updatedVisits);
+      toast.success(visit.is_approved ? 'Onay geri alındı' : 'Ziyaret onaylandı');
     } catch (error) {
       console.error('Approval error:', error);
-      alert('Onay durumu güncellenirken hata oluştu. Lütfen tekrar deneyin.');
+      toast.error('Onay durumu güncellenirken hata oluştu');
     }
   };
 
@@ -214,10 +255,10 @@ export default function PharmaciesPage() {
       setVisits(visits.map(v => v.id === updatedVisit.id ? updatedVisit : v));
       setShowEditModal(false);
       setEditingVisit(null);
-      alert('Ziyaret başarıyla güncellendi!');
+      toast.success('Ziyaret başarıyla güncellendi');
     } catch (error) {
       console.error('Update error:', error);
-      alert('Ziyaret güncellenirken hata oluştu. Lütfen tekrar deneyin.');
+      toast.error('Ziyaret güncellenirken hata oluştu');
     }
   };
 
@@ -236,9 +277,81 @@ export default function PharmaciesPage() {
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">Eczane Ziyaretleri</h1>
 
       {/* Filters */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Employee Filter */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6 space-y-4">
+        {/* Period Buttons */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Dönem Seçimi
+          </label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setSelectedPeriod('day')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                selectedPeriod === 'day'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              Günlük
+            </button>
+            <button
+              onClick={() => setSelectedPeriod('week')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                selectedPeriod === 'week'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              Haftalık
+            </button>
+            <button
+              onClick={() => setSelectedPeriod('month')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                selectedPeriod === 'month'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              Aylık
+            </button>
+            <button
+              onClick={() => setSelectedPeriod('year')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                selectedPeriod === 'year'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              Yıllık
+            </button>
+          </div>
+        </div>
+
+        {/* Date Picker and Other Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          {/* Start Date */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Başlangıç Tarihi
+            </label>
+            <CustomDateInput
+              value={startDate}
+              onChange={(value) => setStartDate(value)}
+            />
+          </div>
+
+          {/* End Date */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Bitiş Tarihi
+            </label>
+            <CustomDateInput
+              value={endDate}
+              onChange={(value) => setEndDate(value)}
+            />
+          </div>
+
+          {/* Çalışan Filtresi */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Çalışan
@@ -252,23 +365,6 @@ export default function PharmaciesPage() {
               {employees.map((emp) => (
                 <option key={emp.id} value={emp.id}>{emp.full_name}</option>
               ))}
-            </select>
-          </div>
-
-          {/* Period Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Dönem
-            </label>
-            <select
-              value={selectedPeriod}
-              onChange={(e) => setSelectedPeriod(e.target.value as any)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-            >
-              <option value="day">Günlük</option>
-              <option value="week">Haftalık</option>
-              <option value="month">Aylık</option>
-              <option value="year">Yıllık</option>
             </select>
           </div>
 

@@ -160,6 +160,8 @@ def delete_doctor_visit(
 @router.get("/pharmacies")
 def get_pharmacy_visits(
     visit_date: Optional[date] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
     employee_id: Optional[int] = None,
     pharmacy_id: Optional[int] = None,
     pharmacy_name: Optional[str] = None,  # Yeni: Eczane adı filtresi
@@ -188,8 +190,18 @@ def get_pharmacy_visits(
         search_term = f"%{pharmacy_name.lower().strip()}%"
         query = query.filter(PharmacyVisit.pharmacy_name.ilike(search_term))
 
-    # Tarih filtresi
-    if visit_date:
+    # Tarih filtresi - start_date ve end_date varsa aralık olarak filtrele
+    if start_date and end_date:
+        start_datetime = datetime.combine(start_date, datetime.min.time())
+        end_datetime = datetime.combine(end_date, datetime.max.time())
+        query = query.filter(
+            and_(
+                PharmacyVisit.visit_date >= start_datetime,
+                PharmacyVisit.visit_date <= end_datetime
+            )
+        )
+    elif visit_date:
+        # Sadece visit_date varsa tek tarih filtresi
         query = query.filter(PharmacyVisit.visit_date == visit_date)
 
     visits = query.order_by(PharmacyVisit.visit_date.desc()).offset(skip).limit(limit).all()
@@ -222,6 +234,8 @@ def get_pharmacy_visits(
 @router.get("/pharmacies/stats")
 def get_pharmacy_visit_stats(
     period: Optional[str] = None,  # 'day', 'week', 'month', 'year'
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
     employee_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: Employee = Depends(get_current_user)
@@ -229,18 +243,25 @@ def get_pharmacy_visit_stats(
     """
     Eczane ziyaretleri istatistikleri
     """
-    # Period'a göre tarih aralığı belirle
-    end_date = datetime.now().date()
-    start_date = None
+    # Tarih aralığını belirle
+    if not start_date or not end_date:
+        # Period'a göre tarih aralığı belirle
+        end_date_calc = datetime.now().date()
+        start_date_calc = None
 
-    if period == 'day':
-        start_date = end_date
-    elif period == 'week':
-        start_date = end_date - timedelta(days=7)
-    elif period == 'month':
-        start_date = end_date - timedelta(days=30)
-    elif period == 'year':
-        start_date = end_date - timedelta(days=365)
+        if period == 'day':
+            start_date_calc = end_date_calc
+        elif period == 'week':
+            start_date_calc = end_date_calc - timedelta(days=7)
+        elif period == 'month':
+            start_date_calc = end_date_calc - timedelta(days=30)
+        elif period == 'year':
+            start_date_calc = end_date_calc - timedelta(days=365)
+
+        if not start_date:
+            start_date = start_date_calc
+        if not end_date:
+            end_date = end_date_calc
 
     # Yetki kontrolü
     target_employee_id = None
@@ -255,9 +276,11 @@ def get_pharmacy_visit_stats(
     if target_employee_id:
         query = query.filter(PharmacyVisit.employee_id == target_employee_id)
     if start_date:
-        query = query.filter(PharmacyVisit.visit_date >= start_date)
+        start_datetime = datetime.combine(start_date, datetime.min.time())
+        query = query.filter(PharmacyVisit.visit_date >= start_datetime)
     if end_date:
-        query = query.filter(PharmacyVisit.visit_date <= end_date)
+        end_datetime = datetime.combine(end_date, datetime.max.time())
+        query = query.filter(PharmacyVisit.visit_date <= end_datetime)
 
     # Toplam ziyaret sayısı
     total_visits = query.count()
@@ -267,9 +290,11 @@ def get_pharmacy_visit_stats(
     if target_employee_id:
         mf_query = mf_query.filter(PharmacyVisit.employee_id == target_employee_id)
     if start_date:
-        mf_query = mf_query.filter(PharmacyVisit.visit_date >= start_date)
+        start_datetime = datetime.combine(start_date, datetime.min.time())
+        mf_query = mf_query.filter(PharmacyVisit.visit_date >= start_datetime)
     if end_date:
-        mf_query = mf_query.filter(PharmacyVisit.visit_date <= end_date)
+        end_datetime = datetime.combine(end_date, datetime.max.time())
+        mf_query = mf_query.filter(PharmacyVisit.visit_date <= end_datetime)
     total_mf = mf_query.scalar() or 0
 
     # Toplam satılan ürün sayısı
@@ -277,9 +302,11 @@ def get_pharmacy_visit_stats(
     if target_employee_id:
         products_query = products_query.filter(PharmacyVisit.employee_id == target_employee_id)
     if start_date:
-        products_query = products_query.filter(PharmacyVisit.visit_date >= start_date)
+        start_datetime = datetime.combine(start_date, datetime.min.time())
+        products_query = products_query.filter(PharmacyVisit.visit_date >= start_datetime)
     if end_date:
-        products_query = products_query.filter(PharmacyVisit.visit_date <= end_date)
+        end_datetime = datetime.combine(end_date, datetime.max.time())
+        products_query = products_query.filter(PharmacyVisit.visit_date <= end_datetime)
     total_products = products_query.scalar() or 0
 
     # Onaylanan / Onay bekleyen

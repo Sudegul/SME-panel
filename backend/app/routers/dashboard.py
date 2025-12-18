@@ -422,3 +422,228 @@ def get_employee_ranking(
         return {
             "my_ranking": user_rank
         }
+
+
+@router.get("/week-star")
+def get_week_star(
+    db: Session = Depends(get_db),
+    current_user: Employee = Depends(get_current_user)
+):
+    """
+    Haftanın yıldızı - En çok satış yapan çalışan (bu hafta)
+    """
+    today = date.today()
+    weekday = today.weekday()
+    if weekday == 6:  # Bugün pazar
+        days_since_sunday = 0
+    else:
+        days_since_sunday = weekday + 1
+
+    last_sunday = today - timedelta(days=days_since_sunday)
+    start_datetime = datetime.combine(last_sunday, datetime.min.time())
+    end_datetime = datetime.combine(today, datetime.max.time())
+
+    # Bu hafta en çok product_count toplayan çalışan
+    result = db.query(
+        Employee.id,
+        Employee.full_name,
+        func.coalesce(func.sum(PharmacyVisit.product_count), 0).label('sales_count')
+    ).join(
+        PharmacyVisit, PharmacyVisit.employee_id == Employee.id
+    ).filter(
+        and_(
+            Employee.role == EmployeeRole.EMPLOYEE,
+            PharmacyVisit.visit_date >= start_datetime,
+            PharmacyVisit.visit_date <= end_datetime
+        )
+    ).group_by(
+        Employee.id, Employee.full_name
+    ).order_by(
+        func.sum(PharmacyVisit.product_count).desc()
+    ).first()
+
+    if not result:
+        return {
+            "employee_name": "Henüz veri yok",
+            "sales_count": 0
+        }
+
+    return {
+        "employee_id": result.id,
+        "employee_name": result.full_name,
+        "sales_count": int(result.sales_count)
+    }
+
+
+@router.get("/chart-data")
+def get_chart_data(
+    period: str = Query("month", regex="^(week|month|year)$"),
+    db: Session = Depends(get_db),
+    current_user: Employee = Depends(get_current_user)
+):
+    """
+    Grafik verisi - Ziyaret ve satış verileri birlikte
+    """
+    today = date.today()
+
+    # Periyoda göre veri yapısını belirle
+    if period == "week":
+        # Son 5 iş günü (Pazartesi-Cuma)
+        data = []
+        days = ["Pzt", "Sal", "Çar", "Per", "Cum"]
+        for i in range(4, -1, -1):
+            day_date = today - timedelta(days=i)
+
+            # O günün ziyaret sayısı
+            visit_count = db.query(func.count(DoctorVisit.id)).filter(
+                func.date(DoctorVisit.visit_date) == day_date
+            ).scalar() or 0
+
+            # O günün satış sayısı (product_count toplamı)
+            sales_count = db.query(func.coalesce(func.sum(PharmacyVisit.product_count), 0)).filter(
+                func.date(PharmacyVisit.visit_date) == day_date
+            ).scalar() or 0
+
+            data.append({
+                "name": days[4-i],
+                "ziyaret": visit_count,
+                "satis": int(sales_count)
+            })
+
+    elif period == "month":
+        # Son 4 hafta
+        data = []
+        for week_num in range(4, 0, -1):
+            week_start = today - timedelta(days=(week_num * 7))
+            week_end = week_start + timedelta(days=6)
+
+            visit_count = db.query(func.count(DoctorVisit.id)).filter(
+                and_(
+                    DoctorVisit.visit_date >= datetime.combine(week_start, datetime.min.time()),
+                    DoctorVisit.visit_date <= datetime.combine(week_end, datetime.max.time())
+                )
+            ).scalar() or 0
+
+            sales_count = db.query(func.coalesce(func.sum(PharmacyVisit.product_count), 0)).filter(
+                and_(
+                    PharmacyVisit.visit_date >= datetime.combine(week_start, datetime.min.time()),
+                    PharmacyVisit.visit_date <= datetime.combine(week_end, datetime.max.time())
+                )
+            ).scalar() or 0
+
+            data.append({
+                "name": f"Hafta {5-week_num}",
+                "ziyaret": visit_count,
+                "satis": int(sales_count)
+            })
+
+    else:  # year
+        # Son 11 ay + bu ay (toplam 11 ay)
+        data = []
+        months = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"]
+
+        for i in range(10, -1, -1):
+            month_date = today - timedelta(days=i*30)
+            month_num = month_date.month
+
+            visit_count = db.query(func.count(DoctorVisit.id)).filter(
+                and_(
+                    extract('year', DoctorVisit.visit_date) == month_date.year,
+                    extract('month', DoctorVisit.visit_date) == month_num
+                )
+            ).scalar() or 0
+
+            sales_count = db.query(func.coalesce(func.sum(PharmacyVisit.product_count), 0)).filter(
+                and_(
+                    extract('year', PharmacyVisit.visit_date) == month_date.year,
+                    extract('month', PharmacyVisit.visit_date) == month_num
+                )
+            ).scalar() or 0
+
+            data.append({
+                "name": months[month_num - 1],
+                "ziyaret": visit_count,
+                "satis": int(sales_count)
+            })
+
+    return data
+
+
+@router.get("/doctor-visits-pie")
+def get_doctor_visits_pie(
+    db: Session = Depends(get_db),
+    current_user: Employee = Depends(get_current_user)
+):
+    """
+    Hekim ziyaretleri pasta grafiği - Çalışan bazlı oranlar (bu ay)
+    """
+    today = date.today()
+    start_date = today.replace(day=1)
+    start_datetime = datetime.combine(start_date, datetime.min.time())
+    end_datetime = datetime.combine(today, datetime.max.time())
+
+    # Çalışanlara göre hekim ziyareti sayıları
+    results = db.query(
+        Employee.full_name,
+        func.count(DoctorVisit.id).label('visit_count')
+    ).join(
+        DoctorVisit, DoctorVisit.employee_id == Employee.id
+    ).filter(
+        and_(
+            Employee.role == EmployeeRole.EMPLOYEE,
+            DoctorVisit.visit_date >= start_datetime,
+            DoctorVisit.visit_date <= end_datetime
+        )
+    ).group_by(
+        Employee.id, Employee.full_name
+    ).order_by(
+        func.count(DoctorVisit.id).desc()
+    ).all()
+
+    return [
+        {
+            "name": r.full_name,
+            "value": r.visit_count
+        }
+        for r in results
+    ]
+
+
+@router.get("/pharmacy-visits-pie")
+def get_pharmacy_visits_pie(
+    db: Session = Depends(get_db),
+    current_user: Employee = Depends(get_current_user)
+):
+    """
+    Eczane ziyaretleri pasta grafiği - Çalışan bazlı oranlar (bu ay)
+    """
+    today = date.today()
+    start_date = today.replace(day=1)
+    start_datetime = datetime.combine(start_date, datetime.min.time())
+    end_datetime = datetime.combine(today, datetime.max.time())
+
+    # Çalışanlara göre eczane ziyareti sayıları
+    results = db.query(
+        Employee.full_name,
+        func.count(PharmacyVisit.id).label('visit_count')
+    ).join(
+        PharmacyVisit, PharmacyVisit.employee_id == Employee.id
+    ).filter(
+        and_(
+            Employee.role == EmployeeRole.EMPLOYEE,
+            PharmacyVisit.visit_date >= start_datetime,
+            PharmacyVisit.visit_date <= end_datetime
+        )
+    ).group_by(
+        Employee.id, Employee.full_name
+    ).order_by(
+        func.count(PharmacyVisit.id).desc()
+    ).all()
+
+    return [
+        {
+            "name": r.full_name,
+            "value": r.visit_count
+        }
+        for r in results
+    ]

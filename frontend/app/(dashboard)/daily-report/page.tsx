@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import axios from '@/lib/axios';
 import { Building, Stethoscope, Pill, Plus, X, Trash2, Edit, ChevronDown, ChevronRight } from 'lucide-react';
 import DateSelector from '@/components/DateSelector';
+import { toast } from 'react-toastify';
 
 interface DoctorVisit {
   id?: number;
@@ -59,7 +60,7 @@ export default function DailyReportPage() {
   const [pharmacyVisits, setPharmacyVisits] = useState<PharmacyVisit[]>([]);
   const [colorScales, setColorScales] = useState<ColorScale[]>([]);
 
-  // Manager view states
+  // Yönetici view states
   const [employeeReports, setEmployeeReports] = useState<EmployeeDailyReport[]>([]);
   const [colorFilter, setColorFilter] = useState<ColorFilter>('all');
   const [expandedEmployees, setExpandedEmployees] = useState<Set<number>>(new Set());
@@ -124,11 +125,11 @@ export default function DailyReportPage() {
       setColorScales(colorScalesRes.data);
 
       if (userRes.data.role === 'MANAGER' || userRes.data.role === 'ADMIN') {
-        // Manager: Fetch all employees' visits
+        // Yönetici: Fetch all employees' visits
         const employeesRes = await axios.get('/employees/');
         const activeEmployees = employeesRes.data.filter((emp: any) => emp.is_active);
 
-        // Sort employees: EMPLOYEE first, then MANAGER and ADMIN at the end
+        // Sort employees: Çalışan first, then Yönetici and Admin at the end
         activeEmployees.sort((a: any, b: any) => {
           const aIsManagerOrAdmin = a.role === 'MANAGER' || a.role === 'ADMIN';
           const bIsManagerOrAdmin = b.role === 'MANAGER' || b.role === 'ADMIN';
@@ -189,7 +190,7 @@ export default function DailyReportPage() {
 
   const handleAddDoctorVisit = async () => {
     if (!doctorForm.doctor_name.trim() || !doctorForm.hospital_name.trim()) {
-      alert('Lütfen doktor adı ve hastane adını doldurun!');
+      toast.warning('Lütfen doktor adı ve hastane adını doldurun!');
       return;
     }
 
@@ -202,9 +203,9 @@ export default function DailyReportPage() {
       setShowDoctorModal(false);
       setDoctorForm({ doctor_name: '', hospital_name: '', specialty: '', supported_product: '', notes: '' });
       fetchData();
-      alert('Hekim ziyareti başarıyla eklendi!');
+      toast.success('Hekim ziyareti başarıyla eklendi');
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'Hekim ziyareti eklenirken bir hata oluştu');
+      toast.error(error.response?.data?.detail || 'Hekim ziyareti eklenirken bir hata oluştu');
     }
   };
 
@@ -231,7 +232,7 @@ export default function DailyReportPage() {
 
   const handleCreateNewPharmacy = async () => {
     if (!newPharmacyData.name.trim()) {
-      alert('Lütfen eczane adını doldurun!');
+      toast.warning('Lütfen eczane adını doldurun!');
       return;
     }
 
@@ -243,13 +244,13 @@ export default function DailyReportPage() {
     };
 
     if (checkForbidden(newPharmacyData.city) || checkForbidden(newPharmacyData.district)) {
-      alert('Lütfen "mah.", "sk." gibi kısaltmalar kullanmayın. Sadece şehir ve semt adını yazın.');
+      toast.warning('Lütfen "mah.", "sk." gibi kısaltmalar kullanmayın. Sadece şehir ve semt adını yazın.');
       return;
     }
 
     try {
       const res = await axios.post('/pharmacies/create', newPharmacyData);
-      alert(res.data.message || 'Yeni eczane oluşturuldu!');
+      toast.success(res.data.message || 'Yeni eczane oluşturuldu');
       setSelectedPharmacy({
         id: res.data.id,
         name: res.data.name,
@@ -260,13 +261,13 @@ export default function DailyReportPage() {
       });
       setShowNewPharmacyForm(false);
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'Eczane oluşturulurken bir hata oluştu');
+      toast.error(error.response?.data?.detail || 'Eczane oluşturulurken bir hata oluştu');
     }
   };
 
   const handleAddPharmacyVisit = async () => {
     if (!selectedPharmacy) {
-      alert('Lütfen bir eczane seçin veya yeni eczane oluşturun!');
+      toast.warning('Lütfen bir eczane seçin veya yeni eczane oluşturun!');
       return;
     }
 
@@ -288,9 +289,9 @@ export default function DailyReportPage() {
       setNewPharmacyData({ name: '', city: '', district: '' });
       setVisitDetails({ product_count: '', mf_count: '', notes: '' });
       fetchData();
-      alert('Eczane ziyareti başarıyla eklendi!');
+      toast.success('Eczane ziyareti başarıyla eklendi');
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'Eczane ziyareti eklenirken bir hata oluştu');
+      toast.error(error.response?.data?.detail || 'Eczane ziyareti eklenirken bir hata oluştu');
     }
   };
 
@@ -300,8 +301,9 @@ export default function DailyReportPage() {
     try {
       await axios.delete(`/daily-visits/doctors/${id}`);
       fetchData();
+      toast.success('Ziyaret silindi');
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'Ziyaret silinirken bir hata oluştu');
+      toast.error(error.response?.data?.detail || 'Ziyaret silinirken bir hata oluştu');
     }
   };
 
@@ -311,8 +313,9 @@ export default function DailyReportPage() {
     try {
       await axios.delete(`/daily-visits/pharmacies/${id}`);
       fetchData();
+      toast.success('Ziyaret silindi');
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'Ziyaret silinirken bir hata oluştu');
+      toast.error(error.response?.data?.detail || 'Ziyaret silinirken bir hata oluştu');
     }
   };
 
@@ -342,9 +345,9 @@ export default function DailyReportPage() {
       setEditingPharmacyVisit(null);
       setEditPharmacyVisitForm({ product_count: '', mf_count: '', notes: '' });
       fetchData();
-      alert('Ziyaret başarıyla güncellendi!');
+      toast.success('Ziyaret başarıyla güncellendi');
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'Güncelleme sırasında bir hata oluştu');
+      toast.error(error.response?.data?.detail || 'Güncelleme sırasında bir hata oluştu');
     }
   };
 
@@ -447,7 +450,7 @@ export default function DailyReportPage() {
     );
   }
 
-  // Manager View
+  // Yönetici View
   if (user?.role === 'MANAGER' || user?.role === 'ADMIN') {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -478,11 +481,11 @@ export default function DailyReportPage() {
           </div>
         </div>
 
-        {/* Employee Reports */}
+        {/* Çalışan Raporları */}
         <div className="space-y-6">
           {filteredEmployeeReports.map((report) => (
             <div key={report.employee_id} className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-              {/* Employee Name Header - Colored + Clickable */}
+              {/* Çalışan İsmi Header - Colored + Clickable */}
               <div
                 className={`p-4 ${getColorClass(report.doctor_visits.length)} cursor-pointer hover:opacity-90 transition-opacity`}
                 onClick={() => {
@@ -600,7 +603,7 @@ export default function DailyReportPage() {
     );
   }
 
-  // Regular Employee View
+  // Çalışan View
 
   return <>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

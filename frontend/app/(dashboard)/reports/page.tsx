@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from '@/lib/axios';
 import { Download, Calendar, Filter, FileSpreadsheet, TrendingUp, Users } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 type ReportCategory = 'weekly-plans' | 'daily-reports' | 'growth-tracking';
 type VisitType = 'all' | 'doctor' | 'pharmacy';
@@ -40,7 +41,7 @@ export default function ReportsPage() {
       setUser(userRes.data);
 
       if (userRes.data.role !== 'MANAGER' && userRes.data.role !== 'ADMIN') {
-        alert('Bu sayfaya erişim yetkiniz yok!');
+        toast.error('Bu sayfaya erişim yetkiniz yok!');
         router.push('/');
         return;
       }
@@ -76,7 +77,7 @@ export default function ReportsPage() {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Export error:', error);
-      alert('Rapor indirilirken hata oluştu. Lütfen tekrar deneyin.');
+      toast.error('Rapor indirilirken hata oluştu. Lütfen tekrar deneyin.');
     }
   };
 
@@ -141,7 +142,7 @@ export default function ReportsPage() {
         pharmacyLink.remove();
         window.URL.revokeObjectURL(pharmacyUrl);
 
-        alert('2 dosya indirildi: Hekim Ziyaretleri ve Eczane Ziyaretleri');
+        toast.success('2 dosya indirildi: Hekim Ziyaretleri ve Eczane Ziyaretleri');
       } else {
         // Tek dosya indir (sadece doctor veya sadece pharmacy)
         const response = await axios.get(`/reports/export/daily-reports?period=${period}&employee=${employeeParam}&visit_type=${visitType}`, {
@@ -161,7 +162,7 @@ export default function ReportsPage() {
       }
     } catch (error) {
       console.error('Export error:', error);
-      alert('Rapor indirilirken hata oluştu. Lütfen tekrar deneyin.');
+      toast.error('Rapor indirilirken hata oluştu. Lütfen tekrar deneyin.');
     }
   };
 
@@ -198,7 +199,7 @@ export default function ReportsPage() {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Export error:', error);
-      alert('Rapor indirilirken hata oluştu. Lütfen tekrar deneyin.');
+      toast.error('Rapor indirilirken hata oluştu. Lütfen tekrar deneyin.');
     }
   };
 
@@ -397,7 +398,7 @@ export default function ReportsPage() {
               </div>
             </div>
 
-            {/* Employee Selection */}
+            {/* Çalışan Seçimi */}
             <div>
               <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">
                 <Users className="w-5 h-5" />
@@ -451,7 +452,7 @@ export default function ReportsPage() {
           </p>
 
           <div className="space-y-6 mb-8">
-            {/* Employee Selection */}
+            {/* Çalışan Seçimi */}
             <div>
               <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">
                 <Users className="w-5 h-5" />

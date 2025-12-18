@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { authAPI } from '@/lib/axios';
 import { LogIn, Moon, Sun } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
+import { toast } from 'react-toastify';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -21,9 +22,14 @@ export default function LoginPage() {
     try {
       const response = await authAPI.login(email, password);
       localStorage.setItem('token', response.data.access_token);
-      router.push('/');
+      toast.success('Giriş başarılı! Yönlendiriliyorsunuz...');
+      setTimeout(() => {
+        router.push('/');
+      }, 500);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Giriş başarısız oldu');
+      const errorMessage = err.response?.data?.detail || 'Giriş başarısız oldu';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
