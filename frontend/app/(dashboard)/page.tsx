@@ -4,7 +4,22 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from '@/lib/axios';
 import { Star, TrendingUp, Users, Package } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+// Dynamic import: Grafikler sadece dashboard açıldığında yüklenecek
+import dynamic from 'next/dynamic';
+
+// Recharts bileşenlerini lazy load et - SSR kapalı çünkü browser API kullanıyorlar
+// loading: null ile yüklenirken hiçbir şey gösterme (daha hızlı render)
+const LineChart = dynamic(() => import('recharts').then((mod) => mod.LineChart), { ssr: false, loading: () => null });
+const Line = dynamic(() => import('recharts').then((mod) => mod.Line), { ssr: false, loading: () => null });
+const XAxis = dynamic(() => import('recharts').then((mod) => mod.XAxis), { ssr: false, loading: () => null });
+const YAxis = dynamic(() => import('recharts').then((mod) => mod.YAxis), { ssr: false, loading: () => null });
+const CartesianGrid = dynamic(() => import('recharts').then((mod) => mod.CartesianGrid), { ssr: false, loading: () => null });
+const Tooltip = dynamic(() => import('recharts').then((mod) => mod.Tooltip), { ssr: false, loading: () => null });
+const Legend = dynamic(() => import('recharts').then((mod) => mod.Legend), { ssr: false, loading: () => null });
+const ResponsiveContainer = dynamic(() => import('recharts').then((mod) => mod.ResponsiveContainer), { ssr: false, loading: () => null });
+const PieChart = dynamic(() => import('recharts').then((mod) => mod.PieChart), { ssr: false, loading: () => null });
+const Pie = dynamic(() => import('recharts').then((mod) => mod.Pie), { ssr: false, loading: () => null });
+const Cell = dynamic(() => import('recharts').then((mod) => mod.Cell), { ssr: false, loading: () => null });
 
 interface DashboardStats {
   period: { start_date: string; end_date: string };
@@ -148,10 +163,38 @@ export default function Dashboard() {
     }
   };
 
+  // Loading state - Skeleton göster
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-white dark:bg-gray-900">
-        <div className="text-xl text-gray-600 dark:text-gray-300">Yükleniyor...</div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Haftanın Yıldızı Skeleton */}
+        <div className="mb-8 bg-gradient-to-r from-emerald-700/85 to-teal-600/80 dark:from-emerald-700/42 dark:to-teal-600/34 rounded-xl p-8 shadow-2xl">
+          <div className="flex items-center gap-6">
+            <div className="w-14 h-14 bg-white/20 rounded-full animate-pulse" />
+            <div className="space-y-2">
+              <div className="h-6 w-32 bg-white/20 rounded animate-pulse" />
+              <div className="h-8 w-48 bg-white/20 rounded animate-pulse" />
+              <div className="h-4 w-24 bg-white/20 rounded animate-pulse" />
+            </div>
+          </div>
+        </div>
+
+        {/* Grafik Skeleton */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
+          <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-6 animate-pulse" />
+          <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+        </div>
+
+        {/* 3 Kart Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-4 animate-pulse" />
+              <div className="h-10 w-20 bg-gray-200 dark:bg-gray-700 rounded mb-2 animate-pulse" />
+              <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -161,7 +204,7 @@ export default function Dashboard() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Haftanın Yıldızı */}
-        {weekStar && (
+        {weekStar ? (
           <div className="mb-8 bg-gradient-to-r from-emerald-700/85 via-teal-700/83 via-emerald-600/81 to-teal-600/80 dark:from-emerald-700/42 dark:via-teal-700/39 dark:via-emerald-600/36 dark:to-teal-600/34 rounded-xl p-8 shadow-2xl backdrop-blur-md border border-white/20 dark:border-white/10">
             <div className="flex items-center gap-6">
               <div className="animate-spin-slow relative">
@@ -175,6 +218,10 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+        ) : (
+          <div className="mb-8 bg-gray-100 dark:bg-gray-800 rounded-xl p-8 border border-gray-200 dark:border-gray-700">
+            <p className="text-center text-gray-500 dark:text-gray-400">Haftanın yıldızı verisi yükleniyor...</p>
+          </div>
         )}
 
         {/* Grafik */}
@@ -187,17 +234,23 @@ export default function Dashboard() {
               <button onClick={() => setPeriod('year')} className={`px-4 py-2 rounded-lg ${period === 'year' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>1 Yıl</button>
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="ziyaret" stroke="#3B82F6" strokeWidth={2} name="Ziyaret" />
-              <Line type="monotone" dataKey="satis" stroke="#10B981" strokeWidth={2} name="Satış" />
-            </LineChart>
-          </ResponsiveContainer>
+          {chartData && chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="ziyaret" stroke="#3B82F6" strokeWidth={2} name="Ziyaret" />
+                <Line type="monotone" dataKey="satis" stroke="#10B981" strokeWidth={2} name="Satış" />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-gray-500 dark:text-gray-400">
+              Grafik verisi yükleniyor...
+            </div>
+          )}
         </div>
 
         {/* 3 Bölüm */}
@@ -221,7 +274,7 @@ export default function Dashboard() {
                 <option value="this-year">Bu Yıl</option>
               </select>
             </div>
-            {visitStats && (
+            {visitStats ? (
               <div className="space-y-3">
                 <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Toplam Ziyaret</p>
@@ -235,6 +288,10 @@ export default function Dashboard() {
                   <span className="text-gray-600 dark:text-gray-400">Eczane:</span>
                   <span className="font-semibold dark:text-gray-200">{visitStats.visits.pharmacy}</span>
                 </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-32 text-gray-400 dark:text-gray-500">
+                Yükleniyor...
               </div>
             )}
           </div>
@@ -259,7 +316,7 @@ export default function Dashboard() {
                 <option value="this-year">Bu Yıl</option>
               </select>
             </div>
-            {salesStats && (
+            {salesStats ? (
               <div className="space-y-3">
                 <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Toplam Satış</p>
@@ -274,6 +331,10 @@ export default function Dashboard() {
                   </p>
                 </div>
               </div>
+            ) : (
+              <div className="flex items-center justify-center h-32 text-gray-400 dark:text-gray-500">
+                Yükleniyor...
+              </div>
             )}
           </div>
 
@@ -283,7 +344,7 @@ export default function Dashboard() {
               <TrendingUp className="w-6 h-6 text-purple-600 dark:text-purple-400" />
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Hedef Durumu</h3>
             </div>
-            {stats?.goal && (
+            {stats?.goal ? (
               <div className="space-y-4">
                 <div>
                   <div className="flex justify-between text-sm mb-1">
@@ -305,6 +366,10 @@ export default function Dashboard() {
                   </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">₺{stats.goal.current_sales.toLocaleString()} / ₺{stats.goal.target_sales.toLocaleString()}</p>
                 </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-32 text-gray-400 dark:text-gray-500">
+                Yükleniyor...
               </div>
             )}
           </div>
