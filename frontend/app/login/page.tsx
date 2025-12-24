@@ -86,10 +86,10 @@ export default function LoginPage() {
             <Image
               src="/images/logo.png"
               alt="Logo"
-              width={200}
-              height={200}
+              width={210}
+              height={210}
               priority // LCP için önemli - sayfa açılır açılmaz yüklensin
-              className="w-auto h-auto max-h-[200px]"
+              className="w-auto h-auto max-h-[210px]"
             />
           </div>
           <p className="text-gray-500 dark:text-gray-400">Satış Yönetim Sistemi</p>
@@ -160,7 +160,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-8">
-          © 2025 Satış Yönetim Sistemi. Tüm hakları saklıdır.
+          © 2025 SME Satış Yönetim Sistemi. Tüm hakları saklıdır.
         </p>
       </div>
     </div>

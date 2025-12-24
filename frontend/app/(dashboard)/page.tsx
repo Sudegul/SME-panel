@@ -4,22 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from '@/lib/axios';
 import { Star, TrendingUp, Users, Package } from 'lucide-react';
-// Dynamic import: Grafikler sadece dashboard açıldığında yüklenecek
-import dynamic from 'next/dynamic';
-
-// Recharts bileşenlerini lazy load et - SSR kapalı çünkü browser API kullanıyorlar
-// loading: null ile yüklenirken hiçbir şey gösterme (daha hızlı render)
-const LineChart = dynamic(() => import('recharts').then((mod) => mod.LineChart), { ssr: false, loading: () => null });
-const Line = dynamic(() => import('recharts').then((mod) => mod.Line), { ssr: false, loading: () => null });
-const XAxis = dynamic(() => import('recharts').then((mod) => mod.XAxis), { ssr: false, loading: () => null });
-const YAxis = dynamic(() => import('recharts').then((mod) => mod.YAxis), { ssr: false, loading: () => null });
-const CartesianGrid = dynamic(() => import('recharts').then((mod) => mod.CartesianGrid), { ssr: false, loading: () => null });
-const Tooltip = dynamic(() => import('recharts').then((mod) => mod.Tooltip), { ssr: false, loading: () => null });
-const Legend = dynamic(() => import('recharts').then((mod) => mod.Legend), { ssr: false, loading: () => null });
-const ResponsiveContainer = dynamic(() => import('recharts').then((mod) => mod.ResponsiveContainer), { ssr: false, loading: () => null });
-const PieChart = dynamic(() => import('recharts').then((mod) => mod.PieChart), { ssr: false, loading: () => null });
-const Pie = dynamic(() => import('recharts').then((mod) => mod.Pie), { ssr: false, loading: () => null });
-const Cell = dynamic(() => import('recharts').then((mod) => mod.Cell), { ssr: false, loading: () => null });
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 interface DashboardStats {
   period: { start_date: string; end_date: string };
@@ -28,6 +13,8 @@ interface DashboardStats {
   cases: { open: number; in_progress: number; closed: number; total: number };
   goal: { target_visits: number; current_visits: number; visit_progress: number; target_sales: number; current_sales: number; sales_progress: number };
 }
+
+const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
 
 export default function Dashboard() {
   const router = useRouter();
@@ -198,8 +185,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
-  const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

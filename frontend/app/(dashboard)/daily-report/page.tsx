@@ -41,6 +41,8 @@ interface EmployeeDailyReport {
   employee_name: string;
   doctor_visits: DoctorVisit[];
   pharmacy_visits: PharmacyVisit[];
+  is_on_leave?: boolean;
+  leave_type?: string;
 }
 
 interface ColorScale {
@@ -139,20 +141,25 @@ export default function DailyReportPage() {
           return 0;
         });
 
-        const [doctorVisitsRes, pharmacyVisitsRes] = await Promise.all([
+        const [doctorVisitsRes, pharmacyVisitsRes, leavesRes] = await Promise.all([
           axios.get('/daily-visits/doctors', { params: { visit_date: selectedDate, limit: 1000 } }),
-          axios.get('/daily-visits/pharmacies', { params: { visit_date: selectedDate, limit: 1000 } })
+          axios.get('/daily-visits/pharmacies', { params: { visit_date: selectedDate, limit: 1000 } }),
+          axios.get('/leave-requests/employees-on-leave', { params: { check_date: selectedDate } })
         ]);
 
         // Group by employee
         const employeeReportsMap: { [key: number]: EmployeeDailyReport } = {};
+        const leavesData = leavesRes.data;
 
         activeEmployees.forEach((emp: any) => {
+          const leaveInfo = leavesData[emp.id];
           employeeReportsMap[emp.id] = {
             employee_id: emp.id,
             employee_name: emp.full_name,
             doctor_visits: [],
-            pharmacy_visits: []
+            pharmacy_visits: [],
+            is_on_leave: leaveInfo?.is_on_leave || false,
+            leave_type: leaveInfo?.leave_type
           };
         });
 
@@ -508,7 +515,11 @@ export default function DailyReportPage() {
                     <h3 className="text-xl font-bold">{report.employee_name}</h3>
                   </div>
                   <div className="text-sm font-semibold">
-                    {report.doctor_visits.length} Hekim | {report.pharmacy_visits.length} Eczane
+                    {report.is_on_leave ? (
+                      <span className="text-green-600 dark:text-green-400 font-bold">İzinli ({report.leave_type})</span>
+                    ) : (
+                      <>{report.doctor_visits.length} Hekim | {report.pharmacy_visits.length} Eczane</>
+                    )}
                   </div>
                 </div>
               </div>
@@ -516,6 +527,14 @@ export default function DailyReportPage() {
               {/* Visit Details - Collapsible */}
               {expandedEmployees.has(report.employee_id) && (
                 <div className="p-6 space-y-6">
+                {report.is_on_leave ? (
+                  <div className="flex items-center justify-center p-8 bg-green-50 dark:bg-green-900/20 rounded-lg border-2 border-green-300 dark:border-green-700">
+                    <p className="text-lg font-bold text-green-700 dark:text-green-400">
+                      İzinli ({report.leave_type})
+                    </p>
+                  </div>
+                ) : (
+                  <>
                 {/* Hekim Ziyaretleri */}
                 <div>
                   <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
@@ -585,6 +604,8 @@ export default function DailyReportPage() {
                     <p className="text-sm text-gray-500 dark:text-gray-400">Eczane ziyareti yok</p>
                   )}
                 </div>
+                  </>
+                )}
                 </div>
               )}
             </div>

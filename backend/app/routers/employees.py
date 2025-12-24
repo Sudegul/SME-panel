@@ -237,3 +237,67 @@ def change_password(
     db.commit()
 
     return {"message": "Password changed successfully"}
+
+
+@router.patch("/{employee_id}/permissions", response_model=EmployeeResponse)
+def update_employee_permissions(
+    employee_id: int,
+    permissions: dict,
+    db: Session = Depends(get_db),
+    current_user: Employee = Depends(get_current_user)
+):
+    """
+    Update employee permissions (MANAGER only)
+    Manager can grant/revoke permissions to ADMIN users
+    """
+    from ..models.employee import EmployeeRole
+    from ..utils.dependencies import can_manage_user_permissions
+
+    # Only MANAGER can update permissions
+    if not can_manage_user_permissions(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only MANAGER can manage user permissions"
+        )
+
+    # Get target employee
+    db_employee = db.query(Employee).filter(Employee.id == employee_id).first()
+    if not db_employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    # Cannot modify MANAGER's permissions
+    if db_employee.role == EmployeeRole.MANAGER:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot modify MANAGER's permissions. MANAGER always has full access."
+        )
+
+    # Validate permissions structure
+    valid_permissions = {
+        "view_all_leaves",
+        "view_all_daily_reports",
+        "view_all_weekly_plans",
+        "approve_leaves",
+        "manage_leave_types",
+        "manage_roles",
+        "manage_performance_scale",
+        "dashboard_full_access"
+    }
+
+    for key in permissions.keys():
+        if key not in valid_permissions:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid permission key: {key}"
+            )
+
+    # İzin onaylama yetkisi veriliyorsa, tüm izinleri görme yetkisini de otomatik ver
+    if permissions.get("approve_leaves") is True:
+        permissions["view_all_leaves"] = True
+
+    # Update permissions
+    db_employee.permissions = permissions
+    db.commit()
+    db.refresh(db_employee)
+
+    return db_employee

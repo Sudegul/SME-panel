@@ -15,7 +15,8 @@ import {
   BarChart3,
   Settings,
   ClipboardList,
-  Lock
+  Lock,
+  Palmtree
 } from 'lucide-react'
 import { toast } from 'react-toastify'
 
@@ -67,6 +68,7 @@ export default function DashboardLayout({
     { label: 'Günlük Rapor', path: '/daily-report', icon: FileText },
     { label: 'Durum Raporu', path: '/status-report', icon: ClipboardList, roles: ['MANAGER', 'ADMIN'] },
     { label: 'Haftalık Program', path: '/weekly-program', icon: Calendar },
+    { label: 'İzinler', path: '/leaves', icon: Palmtree },
     { label: 'Raporlar', path: '/reports', icon: BarChart3, roles: ['MANAGER', 'ADMIN'] },
     { label: 'Ayarlar', path: '/settings', icon: Settings, roles: ['MANAGER', 'ADMIN'] },
   ]

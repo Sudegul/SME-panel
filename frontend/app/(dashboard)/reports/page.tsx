@@ -285,7 +285,7 @@ export default function ReportsPage() {
             className="w-full py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-3 text-lg font-semibold"
           >
             <Download className="w-6 h-6" />
-            Bu Haftanın Planlarını İndir
+            İndir
           </button>
         </div>
       )}
@@ -438,7 +438,7 @@ export default function ReportsPage() {
             className="w-full py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-3 text-lg font-semibold"
           >
             <Download className="w-6 h-6" />
-            Günlük Raporları İndir
+            İndir
           </button>
         </div>
       )}
@@ -488,7 +488,7 @@ export default function ReportsPage() {
             className="w-full py-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-3 text-lg font-semibold"
           >
             <Download className="w-6 h-6" />
-            Büyüme Takibi Raporunu İndir
+            İndir
           </button>
         </div>
       )}

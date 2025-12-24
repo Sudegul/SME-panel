@@ -4,7 +4,7 @@ import { useEffect, useState, memo, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from '@/lib/axios';
 import useSWR, { mutate } from 'swr';
-import { Search, Filter, Edit, Check, X, Clock } from 'lucide-react';
+import { Search, Filter, Edit, Check, X, Clock, Download } from 'lucide-react';
 import CustomDateInput from '@/components/CustomDateInput';
 import { toast } from 'react-toastify';
 
@@ -386,6 +386,56 @@ export default function PharmaciesPage() {
     }
   };
 
+  // Export to Excel
+  const handleExportToExcel = async () => {
+    try {
+      const params = new URLSearchParams();
+      params.append('start_date', startDate);
+      params.append('end_date', endDate);
+
+      if (selectedEmployee !== 'all') {
+        params.append('employee_id', selectedEmployee);
+      }
+
+      if (searchPharmacy.trim()) {
+        params.append('pharmacy_name', searchPharmacy.trim());
+      }
+
+      if (approvalFilter !== 'all') {
+        params.append('approval_filter', approvalFilter);
+      }
+
+      const response = await axios.get(`/daily-visits/pharmacies/export?${params.toString()}`, {
+        responseType: 'blob'
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+
+      // Backend'den gelen dosya adını kullan
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = 'eczaneziyaretleri.xlsx';
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename=(.+)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+        }
+      }
+      link.setAttribute('download', filename);
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.success('Excel dosyası başarıyla indirildi!');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Excel dosyası indirilirken hata oluştu');
+    }
+  };
+
   // Loading state - İlk yüklenme için
   if (!user || !employees) {
     return (
@@ -397,7 +447,17 @@ export default function PharmaciesPage() {
 
   return <>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">Eczane Ziyaretleri</h1>
+      {/* Header with Export Button */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Eczane Ziyaretleri</h1>
+        <button
+          onClick={handleExportToExcel}
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+        >
+          <Download className="w-5 h-5" />
+          Excel'e Aktar
+        </button>
+      </div>
 
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6 space-y-4">

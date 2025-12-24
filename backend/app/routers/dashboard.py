@@ -20,7 +20,7 @@ def get_dashboard_stats(
     employee_id: Optional[int] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
-    period: Optional[str] = Query(None, regex="^(day|week|month|year)$"),
+    period: Optional[str] = Query(None, regex="^(day|week|last-week|month|year)$"),
     db: Session = Depends(get_db),
     current_user: Employee = Depends(get_current_user)
 ):
@@ -156,6 +156,12 @@ def get_dashboard_stats(
         "sales": {
             "total_count": total_sales,
             "total_revenue": round(total_revenue, 2)
+        },
+        "cases": {
+            "open": 0,
+            "in_progress": 0,
+            "closed": 0,
+            "total": 0
         },
         "goal": goal_status
     }

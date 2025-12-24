@@ -15,6 +15,9 @@ from .routers import (
     pharmacies_router,
     daily_visits_router,
     settings_router,
+    leave_types_router,
+    leave_requests_router,
+    annual_leave_rules_router,
 )
 
 app = FastAPI(
@@ -44,6 +47,9 @@ app.include_router(status_reports_router)
 app.include_router(pharmacies_router)
 app.include_router(daily_visits_router)
 app.include_router(settings_router)
+app.include_router(leave_types_router)
+app.include_router(leave_requests_router)
+app.include_router(annual_leave_rules_router)
 
 
 @app.on_event("startup")

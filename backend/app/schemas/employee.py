@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, Dict, Any
 from datetime import datetime, date
 from ..models.employee import EmployeeRole
 
@@ -30,6 +30,7 @@ class EmployeeResponse(EmployeeBase):
     id: int
     is_active: bool
     hire_date: Optional[date] = None
+    permissions: Optional[Dict[str, Any]] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 
