@@ -153,7 +153,7 @@ export default function Dashboard() {
   // Loading state - Skeleton göster
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-8">
         {/* Haftanın Yıldızı Skeleton */}
         <div className="mb-8 bg-gradient-to-r from-emerald-700/85 to-teal-600/80 dark:from-emerald-700/42 dark:to-teal-600/34 rounded-xl p-8 shadow-2xl">
           <div className="flex items-center gap-6">
@@ -187,7 +187,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-8">
         {/* Haftanın Yıldızı */}
         {weekStar ? (
           <div className="mb-8 bg-gradient-to-r from-emerald-700/85 via-teal-700/83 via-emerald-600/81 to-teal-600/80 dark:from-emerald-700/42 dark:via-teal-700/39 dark:via-emerald-600/36 dark:to-teal-600/34 rounded-xl p-8 shadow-2xl backdrop-blur-md border border-white/20 dark:border-white/10">

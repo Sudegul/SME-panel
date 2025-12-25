@@ -459,21 +459,21 @@ export default function LeavesPage() {
   const approvedLeaves = getFilteredApprovedLeaves();
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-8">
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex justify-between items-center">
+      <div className="mb-4 sm:mb-8">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">İzin Yönetimi</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">İzin Yönetimi</h1>
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">
               {isManager ? 'Çalışanların izinlerini yönetin ve kendi izinlerinizi talep edin' : 'İzin bakiyelerinizi görüntüleyin ve yeni izin talebi oluşturun'}
             </p>
           </div>
           <button
             onClick={() => setShowRequestModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm sm:text-base whitespace-nowrap"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
             Yeni İzin Talebi
           </button>
         </div>
@@ -588,8 +588,9 @@ export default function LeavesPage() {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
         {/* İzin Talepleri Tab */}
         {currentTab === 'requests' && (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <div className="overflow-x-auto -mx-2 sm:mx-0">
+            <div className="inline-block min-w-full align-middle">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
                   {isManager && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Çalışan</th>}

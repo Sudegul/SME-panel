@@ -460,25 +460,25 @@ export default function DailyReportPage() {
   // Yönetici View
   if (user?.role === 'MANAGER' || user?.role === 'ADMIN') {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Günlük Rapor</h1>
-          <p className="text-gray-600 dark:text-gray-300">Çalışanların günlük ziyaret detayları</p>
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-8">
+        <div className="mb-4 sm:mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">Günlük Rapor</h1>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">Çalışanların günlük ziyaret detayları</p>
         </div>
 
         {/* Tarih Seçici ve Filtre */}
-        <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-4">
+        <div className="mb-4 sm:mb-6 bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 space-y-4">
           <DateSelector
             value={selectedDate}
             onChange={setSelectedDate}
             max={today}
           />
-          <div className="flex items-center gap-3 pt-4 border-t dark:border-gray-700">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-4 border-t dark:border-gray-700">
             <label className="text-sm font-medium text-gray-700 dark:text-gray-200">Renk Filtrele:</label>
             <select
               value={colorFilter}
               onChange={(e) => setColorFilter(e.target.value as ColorFilter)}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+              className="w-full sm:w-auto px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm sm:text-base"
             >
               <option value="all">Tümü</option>
               <option value="yellow">Sarı (0-14)</option>
@@ -542,29 +542,31 @@ export default function DailyReportPage() {
                     Hekim Ziyaretleri
                   </h4>
                   {report.doctor_visits.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full border-collapse">
-                        <thead>
-                          <tr className="bg-blue-100 dark:bg-blue-900/40">
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Hastane</th>
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Bölüm</th>
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Hekim</th>
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Desteklenen Ürün</th>
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Notlar</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {report.doctor_visits.map((visit, idx) => (
-                            <tr key={idx} className="border-b border-blue-100 dark:border-blue-900/30 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
-                              <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{visit.hospital_name}</td>
-                              <td className="px-4 py-3 text-sm text-blue-600 dark:text-blue-400">{visit.specialty || '-'}</td>
-                              <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{visit.doctor_name}</td>
-                              <td className="px-4 py-3 text-sm text-green-600 dark:text-green-400 font-medium">{visit.supported_product || '-'}</td>
-                              <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate" title={visit.notes}>{visit.notes || '-'}</td>
+                    <div className="overflow-x-auto -mx-4 sm:mx-0">
+                      <div className="inline-block min-w-full align-middle">
+                        <table className="min-w-full border-collapse">
+                          <thead>
+                            <tr className="bg-blue-100 dark:bg-blue-900/40">
+                              <th className="w-32 sm:w-40 px-2 sm:px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Hastane</th>
+                              <th className="w-24 sm:w-32 px-2 sm:px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Bölüm</th>
+                              <th className="w-28 sm:w-36 px-2 sm:px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Hekim</th>
+                              <th className="w-28 sm:w-36 px-2 sm:px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Desteklenen Ürün</th>
+                              <th className="w-32 sm:w-48 px-2 sm:px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Notlar</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {report.doctor_visits.map((visit, idx) => (
+                              <tr key={idx} className="border-b border-blue-100 dark:border-blue-900/30 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+                                <td className="w-32 sm:w-40 px-2 sm:px-4 py-3 text-xs sm:text-sm text-gray-900 dark:text-white break-words">{visit.hospital_name}</td>
+                                <td className="w-24 sm:w-32 px-2 sm:px-4 py-3 text-xs sm:text-sm text-blue-600 dark:text-blue-400 break-words">{visit.specialty || '-'}</td>
+                                <td className="w-28 sm:w-36 px-2 sm:px-4 py-3 text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">{visit.doctor_name}</td>
+                                <td className="w-28 sm:w-36 px-2 sm:px-4 py-3 text-xs sm:text-sm text-green-600 dark:text-green-400 font-medium break-words">{visit.supported_product || '-'}</td>
+                                <td className="w-32 sm:w-48 px-2 sm:px-4 py-3 text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">{visit.notes || '-'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   ) : (
                     <p className="text-sm text-gray-500 dark:text-gray-400">Hekim ziyareti yok</p>
@@ -578,27 +580,29 @@ export default function DailyReportPage() {
                     Eczane Ziyaretleri
                   </h4>
                   {report.pharmacy_visits.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full border-collapse">
-                        <thead>
-                          <tr className="bg-green-100 dark:bg-green-900/40">
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">Eczane Adı</th>
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">Satılan Ürün Sayısı</th>
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">MF Sayısı</th>
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">Notlar</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {report.pharmacy_visits.map((visit, idx) => (
-                            <tr key={idx} className="border-b border-green-100 dark:border-green-900/30 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors">
-                              <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{visit.pharmacy_name || 'Eczane'}</td>
-                              <td className="px-4 py-3 text-sm text-purple-600 dark:text-purple-400 font-medium">{visit.product_count}</td>
-                              <td className="px-4 py-3 text-sm text-orange-600 dark:text-orange-400 font-medium">{visit.mf_count}</td>
-                              <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate" title={visit.notes}>{visit.notes || '-'}</td>
+                    <div className="overflow-x-auto -mx-4 sm:mx-0">
+                      <div className="inline-block min-w-full align-middle">
+                        <table className="min-w-full border-collapse">
+                          <thead>
+                            <tr className="bg-green-100 dark:bg-green-900/40">
+                              <th className="w-32 sm:w-48 px-2 sm:px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">Eczane Adı</th>
+                              <th className="w-24 sm:w-32 px-2 sm:px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">Satılan Ürün</th>
+                              <th className="w-20 sm:w-24 px-2 sm:px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">MF Sayısı</th>
+                              <th className="w-32 sm:w-48 px-2 sm:px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">Notlar</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {report.pharmacy_visits.map((visit, idx) => (
+                              <tr key={idx} className="border-b border-green-100 dark:border-green-900/30 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors">
+                                <td className="w-32 sm:w-48 px-2 sm:px-4 py-3 text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">{visit.pharmacy_name || 'Eczane'}</td>
+                                <td className="w-24 sm:w-32 px-2 sm:px-4 py-3 text-xs sm:text-sm text-purple-600 dark:text-purple-400 font-medium text-center">{visit.product_count}</td>
+                                <td className="w-20 sm:w-24 px-2 sm:px-4 py-3 text-xs sm:text-sm text-orange-600 dark:text-orange-400 font-medium text-center">{visit.mf_count}</td>
+                                <td className="w-32 sm:w-48 px-2 sm:px-4 py-3 text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">{visit.notes || '-'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   ) : (
                     <p className="text-sm text-gray-500 dark:text-gray-400">Eczane ziyareti yok</p>
