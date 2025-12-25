@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from '@/lib/axios';
-import { Calendar, Plus, X, Trash2, Edit, ChevronDown, ChevronRight as ChevronRightIcon } from 'lucide-react';
+import { Calendar, Plus, X, Trash2, Edit, ChevronDown, ChevronRight as ChevronRightIcon, Download } from 'lucide-react';
 import CustomDateInput from '@/components/CustomDateInput';
 import { toast } from 'react-toastify';
 
@@ -47,7 +47,7 @@ export default function WeeklyProgramPage() {
   const [endDate, setEndDate] = useState<string>('');
   const [expandedPrograms, setExpandedPrograms] = useState<Set<number>>(new Set());
 
-  const dayNames = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+  const dayNames = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma'];
 
   // Helper: Get Monday of a given date
   const getMondayOfWeek = (date: Date): Date => {
@@ -57,13 +57,13 @@ export default function WeeklyProgramPage() {
     return new Date(d.setDate(diff));
   };
 
-  // Helper: Get week range (Monday to Sunday)
+  // Helper: Get week range (Monday to Friday)
   const getWeekRange = (monday: Date): { start: string; end: string } => {
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
+    const friday = new Date(monday);
+    friday.setDate(monday.getDate() + 4); // Pazartesi + 4 = Cuma
     return {
       start: monday.toISOString().split('T')[0],
-      end: sunday.toISOString().split('T')[0]
+      end: friday.toISOString().split('T')[0]
     };
   };
 
@@ -145,7 +145,8 @@ export default function WeeklyProgramPage() {
     nextMonday.setDate(today.getDate() + ((8 - today.getDay()) % 7));
 
     const weekDays: DayPlan[] = [];
-    for (let i = 0; i < 7; i++) {
+    // Sadece hafta içi: Pazartesi-Cuma (5 gün)
+    for (let i = 0; i < 5; i++) {
       const date = new Date(nextMonday);
       date.setDate(nextMonday.getDate() + i);
       weekDays.push({
@@ -161,17 +162,18 @@ export default function WeeklyProgramPage() {
     // Kendi programı değilse düzenleyemez
     if (program.employee_name !== user?.full_name) return false;
 
-    // Pazar günü 23:59'a kadar düzenlenebilir
-    const sundayEnd = new Date(program.week_end);
-    sundayEnd.setHours(23, 59, 59, 999);
+    // Cuma günü 23:59'a kadar düzenlenebilir
+    const fridayEnd = new Date(program.week_end);
+    fridayEnd.setHours(23, 59, 59, 999);
     const now = new Date();
 
-    return now <= sundayEnd;
+    return now <= fridayEnd;
   };
 
   const handleEditProgram = (program: WeeklyProgram) => {
     setEditingProgram(program);
-    setCurrentWeek(program.days);
+    // Sadece hafta içi günleri al (Pazartesi-Cuma)
+    setCurrentWeek(program.days.slice(0, 5));
     setShowEditModal(true);
   };
 
@@ -191,7 +193,7 @@ export default function WeeklyProgramPage() {
     try {
       await axios.post('/weekly-programs/', {
         week_start: currentWeek[0].date,
-        week_end: currentWeek[6].date,
+        week_end: currentWeek[4].date, // Cuma
         days: currentWeek
       });
 
@@ -222,7 +224,7 @@ export default function WeeklyProgramPage() {
     try {
       await axios.put(`/weekly-programs/${editingProgram.id}`, {
         week_start: currentWeek[0].date,
-        week_end: currentWeek[6].date,
+        week_end: currentWeek[4].date, // Cuma
         days: currentWeek
       });
 
@@ -262,17 +264,107 @@ export default function WeeklyProgramPage() {
     );
   }
 
+  const handleExportToExcel = async () => {
+    if (filteredPrograms.length === 0) {
+      toast.error('Export edilecek program bulunamadı');
+      return;
+    }
+
+    try {
+      const workbook = await import('xlsx').then(m => m.default || m);
+
+      // Her program için bir sheet oluştur
+      const wb = workbook.utils.book_new();
+
+      filteredPrograms.forEach((program) => {
+        // Program verilerini hazırla
+        const data: any[][] = [];
+
+        // Başlık satırı
+        data.push([
+          `${program.employee_name} - ${new Date(program.week_start).toLocaleDateString('tr-TR')} - ${new Date(program.week_end).toLocaleDateString('tr-TR')}`
+        ]);
+        data.push([]); // Boş satır
+
+        // Gün başlıkları
+        const dayHeaders = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma'];
+        data.push(dayHeaders);
+
+        // Her gün için maksimum ziyaret sayısını bul
+        const maxVisits = Math.max(...program.days.slice(0, 5).map(d => d.visits.length), 1);
+
+        // Ziyaret satırları
+        for (let i = 0; i < maxVisits; i++) {
+          const row = program.days.slice(0, 5).map(day => {
+            if (day.visits[i]) {
+              return `${i + 1}- ${day.visits[i].hospital_name}`;
+            }
+            return '';
+          });
+          data.push(row);
+        }
+
+        // Sheet oluştur
+        const ws = workbook.utils.aoa_to_sheet(data);
+
+        // Sütun genişlikleri
+        ws['!cols'] = [
+          { wch: 30 },
+          { wch: 30 },
+          { wch: 30 },
+          { wch: 30 },
+          { wch: 30 }
+        ];
+
+        // Sheet'i ekle (isim çok uzunsa kısalt)
+        let sheetName = program.employee_name.substring(0, 30);
+        workbook.utils.book_append_sheet(wb, ws, sheetName);
+      });
+
+      // Excel dosyasını indir
+      const excelBuffer = workbook.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+
+      // Dosya adı
+      const startDate = filteredPrograms[0]?.week_start || '';
+      const endDate = filteredPrograms[0]?.week_end || '';
+      link.setAttribute('download', `haftalik_program_${startDate}_${endDate}.xlsx`);
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.success('Excel dosyası indirildi');
+    } catch (error) {
+      console.error('Excel export hatası:', error);
+      toast.error('Excel dosyası oluşturulamadı');
+    }
+  };
+
   return <>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6 flex justify-between items-center">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Haftalık Program</h1>
-          <button
-            onClick={() => { setShowAddModal(true); initializeWeek(); }}
-            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            <Plus className="w-5 h-5" />
-            Yeni Program Oluştur
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={handleExportToExcel}
+              className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            >
+              <Download className="w-5 h-5" />
+              Excel'e Aktar
+            </button>
+            <button
+              onClick={() => { setShowAddModal(true); initializeWeek(); }}
+              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              <Plus className="w-5 h-5" />
+              Yeni Program Oluştur
+            </button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -466,7 +558,7 @@ export default function WeeklyProgramPage() {
                         </span>
                         {canEditProgram(program) && (
                           <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded-full text-sm">
-                            Pazar 23:59'a kadar düzenlenebilir
+                            Cuma 23:59'a kadar düzenlenebilir
                           </span>
                         )}
                       </div>
@@ -493,7 +585,7 @@ export default function WeeklyProgramPage() {
                     <table className="min-w-full border-collapse">
                       <thead>
                         <tr className="bg-blue-100 dark:bg-blue-900/40">
-                          {program.days.map((day, dayIdx) => (
+                          {program.days.slice(0, 5).map((day, dayIdx) => (
                             <th key={dayIdx} className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-r border-blue-300 dark:border-blue-700">
                               <div className="font-bold">{day.day_name}</div>
                               <div className="text-xs font-normal text-gray-600 dark:text-gray-400">
@@ -505,13 +597,13 @@ export default function WeeklyProgramPage() {
                       </thead>
                       <tbody>
                         <tr className="border-b border-blue-100 dark:border-blue-900/30">
-                          {program.days.map((day, dayIdx) => (
+                          {program.days.slice(0, 5).map((day, dayIdx) => (
                             <td key={dayIdx} className="px-4 py-3 align-top border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                               {day.visits.length > 0 ? (
-                                <div className="space-y-2">
+                                <div className="space-y-1">
                                   {day.visits.map((visit, visitIdx) => (
-                                    <div key={visitIdx} className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2 border border-blue-200 dark:border-blue-700">
-                                      <div className="text-sm font-medium text-gray-900 dark:text-white">{visit.hospital_name}</div>
+                                    <div key={visitIdx} className="bg-blue-50 dark:bg-blue-900/20 rounded px-2 py-1 border border-blue-200 dark:border-blue-700">
+                                      <div className="text-xs text-gray-900 dark:text-white">{visitIdx + 1}- {visit.hospital_name}</div>
                                     </div>
                                   ))}
                                 </div>
@@ -551,7 +643,7 @@ export default function WeeklyProgramPage() {
             <div className="p-6">
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4 mb-6">
                 <p className="text-sm text-blue-900 dark:text-blue-200">
-                  <strong>Hafta:</strong> {currentWeek[0] && new Date(currentWeek[0].date).toLocaleDateString('tr-TR')} - {currentWeek[6] && new Date(currentWeek[6].date).toLocaleDateString('tr-TR')}
+                  <strong>Hafta:</strong> {currentWeek[0] && new Date(currentWeek[0].date).toLocaleDateString('tr-TR')} - {currentWeek[4] && new Date(currentWeek[4].date).toLocaleDateString('tr-TR')}
                 </p>
               </div>
 
@@ -644,7 +736,7 @@ export default function WeeklyProgramPage() {
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Haftalık Program Düzenle</h2>
                 <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-1">
-                  Pazar 23:59'a kadar düzenleyebilirsiniz
+                  Cuma 23:59'a kadar düzenleyebilirsiniz
                 </p>
               </div>
               <button onClick={() => { setShowEditModal(false); setEditingProgram(null); }}>
@@ -655,7 +747,7 @@ export default function WeeklyProgramPage() {
             <div className="p-6">
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4 mb-6">
                 <p className="text-sm text-blue-900 dark:text-blue-200">
-                  <strong>Hafta:</strong> {currentWeek[0] && new Date(currentWeek[0].date).toLocaleDateString('tr-TR')} - {currentWeek[6] && new Date(currentWeek[6].date).toLocaleDateString('tr-TR')}
+                  <strong>Hafta:</strong> {currentWeek[0] && new Date(currentWeek[0].date).toLocaleDateString('tr-TR')} - {currentWeek[4] && new Date(currentWeek[4].date).toLocaleDateString('tr-TR')}
                 </p>
               </div>
 

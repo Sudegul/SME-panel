@@ -171,9 +171,11 @@ export default function DashboardLayout({
               <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                 {user?.full_name}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {user?.role}
-              </p>
+              {(user?.role === 'ADMIN' || user?.role === 'MANAGER') && (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {user?.role}
+                </p>
+              )}
             </div>
             <button
               onClick={toggleTheme}

@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .config import settings
-from .database import init_db
-from .routers import (
+from app.config import settings
+from app.database import init_db
+from app.routers import (
     auth_router,
     employees_router,
     sales_router,
@@ -83,8 +83,8 @@ def health_check():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=8000,
+        app,
+        host=settings.BACKEND_HOST,
+        port=settings.BACKEND_PORT,
         reload=True
     )

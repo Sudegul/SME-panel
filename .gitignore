@@ -59,6 +59,14 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
+# SQL migration scripts (temporary)
+*_tables.sql
+*_column.sql
+*_foreign_key.sql
+*_fields.sql
+*_address_columns.sql
+*_approval.sql
+
 # Flask
 instance/
 .webassets-cache

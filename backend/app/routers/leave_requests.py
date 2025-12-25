@@ -584,13 +584,18 @@ def export_approved_leaves(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     employee_id: Optional[int] = None,
+    employee_name: Optional[str] = None,
+    year: Optional[int] = None,
+    month: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: Employee = Depends(get_current_user)
 ):
     """
     Onaylanmış izinleri Excel'e export et
+    Filtreler: employee_name, year, month
     """
     from ..utils.dependencies import has_permission
+    from sqlalchemy import extract
 
     # Yetki kontrolü
     can_view_all = current_user.role in [EmployeeRole.ADMIN, EmployeeRole.MANAGER] or has_permission(current_user, "view_all_leaves")
@@ -605,8 +610,18 @@ def export_approved_leaves(
     if end_date:
         query = query.filter(LeaveRequest.end_date <= end_date)
 
-    # Çalışan filtresi
-    if employee_id and can_view_all:
+    # Yıl ve ay filtresi
+    if year:
+        query = query.filter(extract('year', LeaveRequest.start_date) == year)
+    if month:
+        query = query.filter(extract('month', LeaveRequest.start_date) == month)
+
+    # Çalışan filtresi (employee_name ile)
+    if employee_name and can_view_all:
+        employee = db.query(Employee).filter(Employee.full_name == employee_name).first()
+        if employee:
+            query = query.filter(LeaveRequest.employee_id == employee.id)
+    elif employee_id and can_view_all:
         query = query.filter(LeaveRequest.employee_id == employee_id)
     elif not can_view_all:
         # Sadece kendi izinlerini görebilir
@@ -807,13 +822,18 @@ def export_approved_leaves(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     employee_id: Optional[int] = None,
+    employee_name: Optional[str] = None,
+    year: Optional[int] = None,
+    month: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: Employee = Depends(get_current_user)
 ):
     """
     Onaylanmış izinleri Excel'e export et
+    Filtreler: employee_name, year, month
     """
     from ..utils.dependencies import has_permission
+    from sqlalchemy import extract
 
     # Yetki kontrolü
     can_view_all = current_user.role in [EmployeeRole.ADMIN, EmployeeRole.MANAGER] or has_permission(current_user, "view_all_leaves")
@@ -828,8 +848,18 @@ def export_approved_leaves(
     if end_date:
         query = query.filter(LeaveRequest.end_date <= end_date)
 
-    # Çalışan filtresi
-    if employee_id and can_view_all:
+    # Yıl ve ay filtresi
+    if year:
+        query = query.filter(extract('year', LeaveRequest.start_date) == year)
+    if month:
+        query = query.filter(extract('month', LeaveRequest.start_date) == month)
+
+    # Çalışan filtresi (employee_name ile)
+    if employee_name and can_view_all:
+        employee = db.query(Employee).filter(Employee.full_name == employee_name).first()
+        if employee:
+            query = query.filter(LeaveRequest.employee_id == employee.id)
+    elif employee_id and can_view_all:
         query = query.filter(LeaveRequest.employee_id == employee_id)
     elif not can_view_all:
         # Sadece kendi izinlerini görebilir

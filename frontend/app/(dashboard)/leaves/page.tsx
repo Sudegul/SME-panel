@@ -79,6 +79,11 @@ export default function LeavesPage() {
   const [showCancelPastLeaveWarning, setShowCancelPastLeaveWarning] = useState(false);
   const [pendingCancelId, setPendingCancelId] = useState<number | null>(null);
 
+  // Onaylanan izinler için filtreler
+  const [periodFilter, setPeriodFilter] = useState<'all' | 'monthly' | 'yearly'>('all');
+  const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
+  const [employees, setEmployees] = useState<any[]>([]);
+
   const isManager = user?.role === 'ADMIN' || user?.role === 'MANAGER';
   const canApproveLeaves = user?.role === 'MANAGER' || user?.permissions?.approve_leaves;
 
@@ -109,6 +114,12 @@ export default function LeavesPage() {
       setActiveLeaves(activeRes.data);
       setLeaveTypes(typesRes.data.filter((t: LeaveType) => t.is_active));
       setIsOnLeaveToday(leaveStatusRes.data);
+
+      // Eğer manager veya admin ise, çalışanları da çek
+      if (userRes.data.role === 'MANAGER' || userRes.data.role === 'ADMIN') {
+        const employeesRes = await axios.get('/employees/');
+        setEmployees(employeesRes.data.filter((emp: any) => emp.is_active));
+      }
     } catch (error: any) {
       console.error('Veri yüklenirken hata:', error);
       if (error.response?.status === 401) {
@@ -240,7 +251,24 @@ export default function LeavesPage() {
 
   const handleExportToExcel = async () => {
     try {
+      // Filtreleri parametreler olarak gönder
+      const params: any = {};
+
+      if (selectedEmployee !== 'all') {
+        params.employee_name = selectedEmployee;
+      }
+
+      if (periodFilter === 'monthly') {
+        const now = new Date();
+        params.year = now.getFullYear();
+        params.month = now.getMonth() + 1; // JavaScript months are 0-indexed
+      } else if (periodFilter === 'yearly') {
+        const now = new Date();
+        params.year = now.getFullYear();
+      }
+
       const response = await axios.get('/leave-requests/export', {
+        params,
         responseType: 'blob'
       });
 
@@ -398,8 +426,37 @@ export default function LeavesPage() {
   const requestsForTab = allRequests;
   // Pending taleplerin sayısı (badge için)
   const pendingCount = allRequests.filter(r => r.status === 'PENDING').length;
-  // Onaylanmış izinler
-  const approvedLeaves = allRequests.filter(r => r.status === 'APPROVED');
+
+  // Onaylanmış izinler - filtrelenmiş
+  const getFilteredApprovedLeaves = () => {
+    let leaves = allRequests.filter(r => r.status === 'APPROVED');
+
+    // Çalışan filtresi
+    if (selectedEmployee !== 'all') {
+      leaves = leaves.filter(l => l.employee_name === selectedEmployee);
+    }
+
+    // Periyot filtresi
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    if (periodFilter === 'monthly') {
+      leaves = leaves.filter(l => {
+        const leaveDate = new Date(l.start_date);
+        return leaveDate.getFullYear() === currentYear && leaveDate.getMonth() === currentMonth;
+      });
+    } else if (periodFilter === 'yearly') {
+      leaves = leaves.filter(l => {
+        const leaveDate = new Date(l.start_date);
+        return leaveDate.getFullYear() === currentYear;
+      });
+    }
+
+    return leaves;
+  };
+
+  const approvedLeaves = getFilteredApprovedLeaves();
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -652,6 +709,66 @@ export default function LeavesPage() {
                 Excel'e Aktar
               </button>
             </div>
+
+            {/* Filtreler */}
+            {isManager && (
+              <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex flex-wrap gap-4">
+                  {/* Periyot Filtresi */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Periyot:</label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setPeriodFilter('all')}
+                        className={`px-4 py-2 text-sm rounded-lg transition ${
+                          periodFilter === 'all'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        Tümü
+                      </button>
+                      <button
+                        onClick={() => setPeriodFilter('monthly')}
+                        className={`px-4 py-2 text-sm rounded-lg transition ${
+                          periodFilter === 'monthly'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        Aylık
+                      </button>
+                      <button
+                        onClick={() => setPeriodFilter('yearly')}
+                        className={`px-4 py-2 text-sm rounded-lg transition ${
+                          periodFilter === 'yearly'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        Yıllık
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Çalışan Filtresi */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Çalışan:</label>
+                    <select
+                      value={selectedEmployee}
+                      onChange={(e) => setSelectedEmployee(e.target.value)}
+                      className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                    >
+                      <option value="all">Tüm Çalışanlar</option>
+                      {employees.map((emp) => (
+                        <option key={emp.id} value={emp.full_name}>{emp.full_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700">
