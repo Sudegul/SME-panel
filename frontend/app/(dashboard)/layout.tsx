@@ -97,7 +97,7 @@ export default function DashboardLayout({
     setPasswordLoading(true)
     try {
       await axios.post('/employees/change-password', {
-        old_password: oldPassword,
+        current_password: oldPassword,
         new_password: newPassword
       })
       toast.success('Şifre başarıyla değiştirildi!')
