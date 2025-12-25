@@ -692,6 +692,7 @@ export default function LeavesPage() {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         )}
 
