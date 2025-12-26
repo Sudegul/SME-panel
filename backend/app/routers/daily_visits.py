@@ -1,8 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
 from typing import List, Optional
 from datetime import date, datetime, timedelta
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment
+import io
 
 from ..database import get_db
 from ..models.employee import Employee, EmployeeRole
@@ -157,9 +161,155 @@ def delete_doctor_visit(
     return {"message": "Visit deleted successfully"}
 
 
+@router.get("/pharmacies/export")
+def export_pharmacy_visits(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    employee_id: Optional[int] = None,
+    pharmacy_name: Optional[str] = None,
+    approval_filter: Optional[str] = None,  # 'all', 'approved', 'pending'
+    db: Session = Depends(get_db),
+    current_user: Employee = Depends(get_current_user)
+):
+    """
+    Eczane ziyaretlerini Excel olarak dışa aktar (seçilen filtrelere göre)
+    """
+    # Yetki kontrolü - Sadece MANAGER ve ADMIN
+    if current_user.role not in [EmployeeRole.ADMIN, EmployeeRole.MANAGER]:
+        raise HTTPException(
+            status_code=403,
+            detail="Bu işlem için yetkiniz yok"
+        )
+
+    # Query oluştur
+    query = db.query(PharmacyVisit)
+
+    # Employee filtresi
+    if employee_id:
+        query = query.filter(PharmacyVisit.employee_id == employee_id)
+
+    # Eczane adı filtresi
+    if pharmacy_name:
+        search_term = f"%{pharmacy_name.lower().strip()}%"
+        query = query.filter(PharmacyVisit.pharmacy_name.ilike(search_term))
+
+    # Tarih aralığı filtresi
+    if start_date and end_date:
+        start_datetime = datetime.combine(start_date, datetime.min.time())
+        end_datetime = datetime.combine(end_date, datetime.max.time())
+        query = query.filter(
+            and_(
+                PharmacyVisit.visit_date >= start_datetime,
+                PharmacyVisit.visit_date <= end_datetime
+            )
+        )
+
+    # Onay durumu filtresi
+    if approval_filter == 'approved':
+        query = query.filter(PharmacyVisit.is_approved == True)
+    elif approval_filter == 'pending':
+        query = query.filter(PharmacyVisit.is_approved == False)
+
+    # Verileri çek
+    visits = query.order_by(PharmacyVisit.visit_date.desc()).all()
+
+    # Çalışan bilgisi için
+    employee_name = "tum_calisanlar"
+    if employee_id:
+        employee = db.query(Employee).filter(Employee.id == employee_id).first()
+        if employee:
+            # Türkçe karakterleri düzelt ve boşlukları alt çizgi yap
+            employee_name = employee.full_name.lower()
+            employee_name = employee_name.replace('ı', 'i').replace('ğ', 'g').replace('ü', 'u')
+            employee_name = employee_name.replace('ş', 's').replace('ö', 'o').replace('ç', 'c')
+            employee_name = employee_name.replace(' ', '_')
+
+    # Excel oluştur
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Eczane Ziyaretleri"
+
+    # Header stil
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF")
+    header_alignment = Alignment(horizontal="center", vertical="center")
+
+    # Header
+    headers = [
+        "Çalışan", "Eczane Adı", "Adres", "Ürün Sayısı", "MF Sayısı",
+        "Ziyaret Tarihi", "Başlangıç Saati", "Bitiş Saati", "Notlar", "Onay Durumu"
+    ]
+
+    for col_num, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_num, value=header)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = header_alignment
+
+    # Data
+    for row_num, visit in enumerate(visits, 2):
+        ws.cell(row=row_num, column=1, value=visit.employee.full_name if visit.employee else "")
+        ws.cell(row=row_num, column=2, value=visit.pharmacy_name)
+        ws.cell(row=row_num, column=3, value=visit.pharmacy_address or "")
+        ws.cell(row=row_num, column=4, value=visit.product_count)
+        ws.cell(row=row_num, column=5, value=visit.mf_count)
+        ws.cell(row=row_num, column=6, value=visit.visit_date.strftime('%d.%m.%Y') if visit.visit_date else "")
+        ws.cell(row=row_num, column=7, value=visit.start_time.strftime('%H:%M') if visit.start_time else "")
+        ws.cell(row=row_num, column=8, value=visit.end_time.strftime('%H:%M') if visit.end_time else "")
+        ws.cell(row=row_num, column=9, value=visit.notes or "")
+        ws.cell(row=row_num, column=10, value="Onaylandı" if visit.is_approved else "Bekliyor")
+
+    # Sütun genişliklerini ayarla
+    column_widths = [20, 30, 40, 12, 12, 15, 15, 15, 40, 15]
+    for col_num, width in enumerate(column_widths, 1):
+        ws.column_dimensions[chr(64 + col_num)].width = width
+
+    # Excel'i hafızada oluştur
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    # Dosya adı oluştur - Türkçe ay isimleri
+    turkish_months = {
+        1: 'ocak', 2: 'subat', 3: 'mart', 4: 'nisan', 5: 'mayis', 6: 'haziran',
+        7: 'temmuz', 8: 'agustos', 9: 'eylul', 10: 'ekim', 11: 'kasim', 12: 'aralik'
+    }
+
+    # Tarih formatı oluştur
+    if start_date and end_date:
+        start_month = turkish_months[start_date.month]
+        start_day = start_date.day
+        end_month = turkish_months[end_date.month]
+        end_day = end_date.day
+        year = end_date.year
+
+        # Aynı gün mü kontrol et
+        if start_date == end_date:
+            date_str = f"{start_month}{start_day}_{year}"
+        else:
+            date_str = f"{start_month}{start_day}_{end_month}{end_day}_{year}"
+    else:
+        # Tarih yoksa bugünün tarihini kullan
+        today = datetime.now()
+        month = turkish_months[today.month]
+        day = today.day
+        year = today.year
+        date_str = f"{month}{day}_{year}"
+
+    filename = f"eczaneziyaretleri_{employee_name}_{date_str}.xlsx"
+
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
 @router.get("/pharmacies")
 def get_pharmacy_visits(
     visit_date: Optional[date] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
     employee_id: Optional[int] = None,
     pharmacy_id: Optional[int] = None,
     pharmacy_name: Optional[str] = None,  # Yeni: Eczane adı filtresi
@@ -188,8 +338,18 @@ def get_pharmacy_visits(
         search_term = f"%{pharmacy_name.lower().strip()}%"
         query = query.filter(PharmacyVisit.pharmacy_name.ilike(search_term))
 
-    # Tarih filtresi
-    if visit_date:
+    # Tarih filtresi - start_date ve end_date varsa aralık olarak filtrele
+    if start_date and end_date:
+        start_datetime = datetime.combine(start_date, datetime.min.time())
+        end_datetime = datetime.combine(end_date, datetime.max.time())
+        query = query.filter(
+            and_(
+                PharmacyVisit.visit_date >= start_datetime,
+                PharmacyVisit.visit_date <= end_datetime
+            )
+        )
+    elif visit_date:
+        # Sadece visit_date varsa tek tarih filtresi
         query = query.filter(PharmacyVisit.visit_date == visit_date)
 
     visits = query.order_by(PharmacyVisit.visit_date.desc()).offset(skip).limit(limit).all()
@@ -222,6 +382,8 @@ def get_pharmacy_visits(
 @router.get("/pharmacies/stats")
 def get_pharmacy_visit_stats(
     period: Optional[str] = None,  # 'day', 'week', 'month', 'year'
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
     employee_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: Employee = Depends(get_current_user)
@@ -229,18 +391,25 @@ def get_pharmacy_visit_stats(
     """
     Eczane ziyaretleri istatistikleri
     """
-    # Period'a göre tarih aralığı belirle
-    end_date = datetime.now().date()
-    start_date = None
+    # Tarih aralığını belirle
+    if not start_date or not end_date:
+        # Period'a göre tarih aralığı belirle
+        end_date_calc = datetime.now().date()
+        start_date_calc = None
 
-    if period == 'day':
-        start_date = end_date
-    elif period == 'week':
-        start_date = end_date - timedelta(days=7)
-    elif period == 'month':
-        start_date = end_date - timedelta(days=30)
-    elif period == 'year':
-        start_date = end_date - timedelta(days=365)
+        if period == 'day':
+            start_date_calc = end_date_calc
+        elif period == 'week':
+            start_date_calc = end_date_calc - timedelta(days=7)
+        elif period == 'month':
+            start_date_calc = end_date_calc - timedelta(days=30)
+        elif period == 'year':
+            start_date_calc = end_date_calc - timedelta(days=365)
+
+        if not start_date:
+            start_date = start_date_calc
+        if not end_date:
+            end_date = end_date_calc
 
     # Yetki kontrolü
     target_employee_id = None
@@ -255,9 +424,11 @@ def get_pharmacy_visit_stats(
     if target_employee_id:
         query = query.filter(PharmacyVisit.employee_id == target_employee_id)
     if start_date:
-        query = query.filter(PharmacyVisit.visit_date >= start_date)
+        start_datetime = datetime.combine(start_date, datetime.min.time())
+        query = query.filter(PharmacyVisit.visit_date >= start_datetime)
     if end_date:
-        query = query.filter(PharmacyVisit.visit_date <= end_date)
+        end_datetime = datetime.combine(end_date, datetime.max.time())
+        query = query.filter(PharmacyVisit.visit_date <= end_datetime)
 
     # Toplam ziyaret sayısı
     total_visits = query.count()
@@ -267,9 +438,11 @@ def get_pharmacy_visit_stats(
     if target_employee_id:
         mf_query = mf_query.filter(PharmacyVisit.employee_id == target_employee_id)
     if start_date:
-        mf_query = mf_query.filter(PharmacyVisit.visit_date >= start_date)
+        start_datetime = datetime.combine(start_date, datetime.min.time())
+        mf_query = mf_query.filter(PharmacyVisit.visit_date >= start_datetime)
     if end_date:
-        mf_query = mf_query.filter(PharmacyVisit.visit_date <= end_date)
+        end_datetime = datetime.combine(end_date, datetime.max.time())
+        mf_query = mf_query.filter(PharmacyVisit.visit_date <= end_datetime)
     total_mf = mf_query.scalar() or 0
 
     # Toplam satılan ürün sayısı
@@ -277,9 +450,11 @@ def get_pharmacy_visit_stats(
     if target_employee_id:
         products_query = products_query.filter(PharmacyVisit.employee_id == target_employee_id)
     if start_date:
-        products_query = products_query.filter(PharmacyVisit.visit_date >= start_date)
+        start_datetime = datetime.combine(start_date, datetime.min.time())
+        products_query = products_query.filter(PharmacyVisit.visit_date >= start_datetime)
     if end_date:
-        products_query = products_query.filter(PharmacyVisit.visit_date <= end_date)
+        end_datetime = datetime.combine(end_date, datetime.max.time())
+        products_query = products_query.filter(PharmacyVisit.visit_date <= end_datetime)
     total_products = products_query.scalar() or 0
 
     # Onaylanan / Onay bekleyen
@@ -433,5 +608,3 @@ def toggle_pharmacy_visit_approval(
         "is_approved": db_visit.is_approved,
         "message": "Onay durumu güncellendi"
     }
-
-

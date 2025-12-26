@@ -1,9 +1,11 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { authAPI } from '@/lib/axios';
 import { LogIn, Moon, Sun } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
+import { toast } from 'react-toastify';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,6 +15,23 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Background image preload - LCP (Largest Contentful Paint) optimizasyonu
+  // Mantık: Browser'a "bu görseli erkenden yükle" diyoruz, böylece sayfa daha hızlı render olur
+  const backgroundImage = theme === 'dark' ? '/images/dark_background.png' : '/images/background.png';
+
+  // Preload meta tag ekle (useEffect ile head'e inject ediyoruz)
+  if (typeof window !== 'undefined') {
+    // Client-side rendering - tarayıcı preload yapabilir
+    const existingPreload = document.querySelector('link[rel="preload"][as="image"]');
+    if (!existingPreload) {
+      const link = document.createElement('link');
+      link.rel = 'preload';
+      link.as = 'image';
+      link.href = backgroundImage;
+      document.head.appendChild(link);
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -21,9 +40,14 @@ export default function LoginPage() {
     try {
       const response = await authAPI.login(email, password);
       localStorage.setItem('token', response.data.access_token);
-      router.push('/');
+      toast.success('Giriş başarılı! Yönlendiriliyorsunuz...');
+      setTimeout(() => {
+        router.push('/');
+      }, 500);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Giriş başarısız oldu');
+      const errorMessage = err.response?.data?.detail || 'Giriş başarısız oldu';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -33,9 +57,7 @@ export default function LoginPage() {
     <div
       className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center p-4"
       style={{
-        backgroundImage: theme === 'dark'
-          ? 'url(/images/dark_background.png)'
-          : 'url(/images/background.png)',
+        backgroundImage: `url(${backgroundImage})`, // Preload edilmiş background image
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
@@ -57,10 +79,18 @@ export default function LoginPage() {
           </button>
         </div>
 
-        {/* Logo */}
+        {/* Logo - Next.js Image ile optimize edilmiş */}
+        {/* Mantık: next/image otomatik olarak WebP format'a çevirir, lazy loading yapar, boyut optimize eder */}
         <div className="text-center mb-10">
           <div className="flex justify-center mb-4">
-            <img src="/images/logo.png" alt="Logo" className="h-54 w-auto" />
+            <Image
+              src="/images/logo.png"
+              alt="Logo"
+              width={210}
+              height={210}
+              priority // LCP için önemli - sayfa açılır açılmaz yüklensin
+              className="w-auto h-auto max-h-[210px]"
+            />
           </div>
           <p className="text-gray-500 dark:text-gray-400">Satış Yönetim Sistemi</p>
         </div>
@@ -130,7 +160,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-8">
-          © 2025 Satış Yönetim Sistemi. Tüm hakları saklıdır.
+          © 2025 SME Satış Yönetim Sistemi. Tüm hakları saklıdır.
         </p>
       </div>
     </div>

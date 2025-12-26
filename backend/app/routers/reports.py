@@ -430,6 +430,9 @@ def export_daily_reports(
     """
     Günlük raporları export et (doktor ve eczane ziyaretleri)
     """
+    from ..models.leave_request import LeaveRequest, LeaveRequestStatus
+    from ..models.leave_type import LeaveType
+
     # Only managers/admins can export reports
     if current_user.role not in [EmployeeRole.MANAGER, EmployeeRole.ADMIN]:
         raise HTTPException(status_code=403, detail="Only managers can export reports")
@@ -450,6 +453,23 @@ def export_daily_reports(
         end_date = today
     else:
         raise HTTPException(status_code=400, detail="Invalid period")
+
+    # Get employees on leave for each date in the range
+    def get_employee_leave_info(emp_id: int, check_date: date):
+        """Check if employee is on leave for the given date"""
+        leave = db.query(LeaveRequest, LeaveType).join(
+            LeaveType, LeaveRequest.leave_type_id == LeaveType.id
+        ).filter(
+            LeaveRequest.employee_id == emp_id,
+            LeaveRequest.status == LeaveRequestStatus.APPROVED,
+            LeaveRequest.start_date <= check_date,
+            LeaveRequest.end_date >= check_date
+        ).first()
+
+        if leave:
+            leave_request, leave_type = leave
+            return f"İzinli ({leave_type.name})"
+        return None
 
     # Excel oluştur
     wb = Workbook()
@@ -488,12 +508,19 @@ def export_daily_reports(
         # Data
         if doctor_visits:
             for row_num, (visit, emp) in enumerate(doctor_visits, 2):
+                leave_info = get_employee_leave_info(emp.id, visit.visit_date.date())
                 ws_doctors.cell(row=row_num, column=1, value=visit.visit_date.strftime('%d.%m.%Y'))
                 ws_doctors.cell(row=row_num, column=2, value=emp.full_name)
-                ws_doctors.cell(row=row_num, column=3, value=visit.doctor_name)
-                ws_doctors.cell(row=row_num, column=4, value=visit.hospital_name)
-                ws_doctors.cell(row=row_num, column=5, value=visit.specialty or '')
-                ws_doctors.cell(row=row_num, column=6, value=visit.notes or '')
+                if leave_info:
+                    ws_doctors.cell(row=row_num, column=3, value=leave_info)
+                    ws_doctors.cell(row=row_num, column=4, value=leave_info)
+                    ws_doctors.cell(row=row_num, column=5, value=leave_info)
+                    ws_doctors.cell(row=row_num, column=6, value=leave_info)
+                else:
+                    ws_doctors.cell(row=row_num, column=3, value=visit.doctor_name)
+                    ws_doctors.cell(row=row_num, column=4, value=visit.hospital_name)
+                    ws_doctors.cell(row=row_num, column=5, value=visit.specialty or '')
+                    ws_doctors.cell(row=row_num, column=6, value=visit.notes or '')
         else:
             # Veri yoksa mesaj ekle
             ws_doctors.merge_cells('A2:F2')
@@ -542,12 +569,19 @@ def export_daily_reports(
         # Data
         if pharmacy_visits:
             for row_num, (visit, emp) in enumerate(pharmacy_visits, 2):
+                leave_info = get_employee_leave_info(emp.id, visit.visit_date.date())
                 ws_pharmacies.cell(row=row_num, column=1, value=visit.visit_date.strftime('%d.%m.%Y'))
                 ws_pharmacies.cell(row=row_num, column=2, value=emp.full_name)
-                ws_pharmacies.cell(row=row_num, column=3, value=visit.pharmacy_name)
-                ws_pharmacies.cell(row=row_num, column=4, value=visit.product_count)
-                ws_pharmacies.cell(row=row_num, column=5, value=visit.mf_count)
-                ws_pharmacies.cell(row=row_num, column=6, value=visit.notes or '')
+                if leave_info:
+                    ws_pharmacies.cell(row=row_num, column=3, value=leave_info)
+                    ws_pharmacies.cell(row=row_num, column=4, value=leave_info)
+                    ws_pharmacies.cell(row=row_num, column=5, value=leave_info)
+                    ws_pharmacies.cell(row=row_num, column=6, value=leave_info)
+                else:
+                    ws_pharmacies.cell(row=row_num, column=3, value=visit.pharmacy_name)
+                    ws_pharmacies.cell(row=row_num, column=4, value=visit.product_count)
+                    ws_pharmacies.cell(row=row_num, column=5, value=visit.mf_count)
+                    ws_pharmacies.cell(row=row_num, column=6, value=visit.notes or '')
         else:
             # Veri yoksa mesaj ekle
             ws_pharmacies.merge_cells('A2:F2')

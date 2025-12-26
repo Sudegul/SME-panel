@@ -1,0 +1,112 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from typing import List
+
+from ..database import get_db
+from ..models.annual_leave_rule import AnnualLeaveRule
+from ..models.employee import Employee, EmployeeRole
+from ..schemas.annual_leave_rule import (
+    AnnualLeaveRuleResponse,
+    AnnualLeaveRulesBulkUpdate
+)
+from ..utils.dependencies import get_current_user
+
+router = APIRouter(prefix="/annual-leave-rules", tags=["Annual Leave Rules"])
+
+
+@router.get("/", response_model=List[AnnualLeaveRuleResponse])
+def get_annual_leave_rules(
+    db: Session = Depends(get_db),
+    current_user: Employee = Depends(get_current_user)
+):
+    """
+    Yıllık izin kurallarını listele
+    Herkes görebilir
+    """
+    rules = db.query(AnnualLeaveRule).order_by(AnnualLeaveRule.year_of_service).all()
+    return rules
+
+
+@router.put("/", response_model=List[AnnualLeaveRuleResponse])
+def update_annual_leave_rules(
+    data: AnnualLeaveRulesBulkUpdate,
+    db: Session = Depends(get_db),
+    current_user: Employee = Depends(get_current_user)
+):
+    """
+    Yıllık izin kurallarını toplu güncelle
+    Sadece MANAGER yapabilir
+    """
+    # Yetki kontrolü
+    if current_user.role != EmployeeRole.MANAGER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bu işlem için MANAGER yetkisi gereklidir"
+        )
+
+    # Tüm mevcut kuralları sil
+    db.query(AnnualLeaveRule).delete()
+
+    # Yeni kuralları ekle
+    new_rules = []
+    for rule_data in data.rules:
+        rule = AnnualLeaveRule(
+            year_of_service=rule_data.year_of_service,
+            days_entitled=rule_data.days_entitled
+        )
+        db.add(rule)
+        new_rules.append(rule)
+
+    db.commit()
+
+    # Refresh all
+    for rule in new_rules:
+        db.refresh(rule)
+
+    return new_rules
+
+
+def calculate_annual_leave_days(hire_date, current_year: int, db: Session) -> int:
+    """
+    İşe giriş tarihine göre yıllık izin hakkını hesapla
+
+    Args:
+        hire_date: İşe giriş tarihi
+        current_year: Hesaplama yapılacak yıl
+        db: Database session
+
+    Returns:
+        Hak edilen yıllık izin günü
+    """
+    from datetime import date
+
+    if not hire_date:
+        return 14  # Varsayılan 14 gün
+
+    # Kaç yıldır çalışıyor hesapla
+    years_of_service = current_year - hire_date.year
+
+    if years_of_service < 0:
+        years_of_service = 0
+
+    # Yıllık izin yılını 1'den başlat (1. yıl, 2. yıl vs.)
+    year_index = years_of_service + 1
+
+    # Kurallara göre hak edilen günü bul
+    rule = db.query(AnnualLeaveRule).filter(
+        AnnualLeaveRule.year_of_service == year_index
+    ).first()
+
+    if rule:
+        return rule.days_entitled
+
+    # Kural yoksa en yüksek yıla ait kuralı kullan
+    max_rule = db.query(AnnualLeaveRule).order_by(
+        AnnualLeaveRule.year_of_service.desc()
+    ).first()
+
+    if max_rule:
+        return max_rule.days_entitled
+
+    # Hiç kural yoksa varsayılan
+    return 14

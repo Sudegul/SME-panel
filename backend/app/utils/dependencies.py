@@ -53,3 +53,44 @@ def get_current_admin_user(
             detail="The user doesn't have enough privileges"
         )
     return current_user
+
+
+def has_permission(user: Employee, permission_key: str) -> bool:
+    """
+    Check if user has a specific permission
+    - MANAGER always returns True (has all permissions)
+    - ADMIN/EMPLOYEE check their permissions JSON field
+    """
+    # Manager always has all permissions
+    if user.role == EmployeeRole.MANAGER:
+        return True
+
+    # If no permissions set, default to False
+    if not user.permissions:
+        return False
+
+    # Check specific permission
+    return user.permissions.get(permission_key, False)
+
+
+def require_permission(permission_key: str):
+    """
+    Dependency to require a specific permission
+    Usage: current_user: Employee = Depends(require_permission("view_all_leaves"))
+    """
+    def _check_permission(current_user: Employee = Depends(get_current_user)) -> Employee:
+        if not has_permission(current_user, permission_key):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"You don't have permission: {permission_key}"
+            )
+        return current_user
+    return _check_permission
+
+
+def can_manage_user_permissions(current_user: Employee) -> bool:
+    """
+    Check if user can manage other users' permissions
+    Only MANAGER can manage permissions
+    """
+    return current_user.role == EmployeeRole.MANAGER

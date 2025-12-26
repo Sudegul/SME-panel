@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, Date
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, Date, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -11,6 +11,12 @@ class EmployeeRole(str, enum.Enum):
     EMPLOYEE = "EMPLOYEE"
 
 
+class Gender(str, enum.Enum):
+    MALE = "MALE"
+    FEMALE = "FEMALE"
+    OTHER = "OTHER"
+
+
 class Employee(Base):
     __tablename__ = "demo_employees"
 
@@ -20,8 +26,23 @@ class Employee(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(Enum(EmployeeRole), default=EmployeeRole.EMPLOYEE)
     phone = Column(String, nullable=True)
+    gender = Column(Enum(Gender), nullable=True)
     hire_date = Column(Date, nullable=True)
     is_active = Column(Boolean, default=True)
+
+    # Permissions (JSON field for granular access control)
+    # Format: {
+    #   "view_all_leaves": false,
+    #   "view_all_daily_reports": false,
+    #   "view_all_weekly_plans": false,
+    #   "approve_leaves": false,
+    #   "manage_leave_types": false,
+    #   "manage_roles": false,
+    #   "manage_performance_scale": false,
+    #   "dashboard_full_access": false
+    # }
+    permissions = Column(JSON, nullable=True, default=None)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

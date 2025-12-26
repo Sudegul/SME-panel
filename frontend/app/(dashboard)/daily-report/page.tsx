@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import axios from '@/lib/axios';
 import { Building, Stethoscope, Pill, Plus, X, Trash2, Edit, ChevronDown, ChevronRight } from 'lucide-react';
 import DateSelector from '@/components/DateSelector';
+import { toast } from 'react-toastify';
 
 interface DoctorVisit {
   id?: number;
@@ -40,6 +41,8 @@ interface EmployeeDailyReport {
   employee_name: string;
   doctor_visits: DoctorVisit[];
   pharmacy_visits: PharmacyVisit[];
+  is_on_leave?: boolean;
+  leave_type?: string;
 }
 
 interface ColorScale {
@@ -59,7 +62,7 @@ export default function DailyReportPage() {
   const [pharmacyVisits, setPharmacyVisits] = useState<PharmacyVisit[]>([]);
   const [colorScales, setColorScales] = useState<ColorScale[]>([]);
 
-  // Manager view states
+  // Yönetici view states
   const [employeeReports, setEmployeeReports] = useState<EmployeeDailyReport[]>([]);
   const [colorFilter, setColorFilter] = useState<ColorFilter>('all');
   const [expandedEmployees, setExpandedEmployees] = useState<Set<number>>(new Set());
@@ -124,11 +127,11 @@ export default function DailyReportPage() {
       setColorScales(colorScalesRes.data);
 
       if (userRes.data.role === 'MANAGER' || userRes.data.role === 'ADMIN') {
-        // Manager: Fetch all employees' visits
+        // Yönetici: Fetch all employees' visits
         const employeesRes = await axios.get('/employees/');
         const activeEmployees = employeesRes.data.filter((emp: any) => emp.is_active);
 
-        // Sort employees: EMPLOYEE first, then MANAGER and ADMIN at the end
+        // Sort employees: Çalışan first, then Yönetici and Admin at the end
         activeEmployees.sort((a: any, b: any) => {
           const aIsManagerOrAdmin = a.role === 'MANAGER' || a.role === 'ADMIN';
           const bIsManagerOrAdmin = b.role === 'MANAGER' || b.role === 'ADMIN';
@@ -138,20 +141,25 @@ export default function DailyReportPage() {
           return 0;
         });
 
-        const [doctorVisitsRes, pharmacyVisitsRes] = await Promise.all([
+        const [doctorVisitsRes, pharmacyVisitsRes, leavesRes] = await Promise.all([
           axios.get('/daily-visits/doctors', { params: { visit_date: selectedDate, limit: 1000 } }),
-          axios.get('/daily-visits/pharmacies', { params: { visit_date: selectedDate, limit: 1000 } })
+          axios.get('/daily-visits/pharmacies', { params: { visit_date: selectedDate, limit: 1000 } }),
+          axios.get('/leave-requests/employees-on-leave', { params: { check_date: selectedDate } })
         ]);
 
         // Group by employee
         const employeeReportsMap: { [key: number]: EmployeeDailyReport } = {};
+        const leavesData = leavesRes.data;
 
         activeEmployees.forEach((emp: any) => {
+          const leaveInfo = leavesData[emp.id];
           employeeReportsMap[emp.id] = {
             employee_id: emp.id,
             employee_name: emp.full_name,
             doctor_visits: [],
-            pharmacy_visits: []
+            pharmacy_visits: [],
+            is_on_leave: leaveInfo?.is_on_leave || false,
+            leave_type: leaveInfo?.leave_type
           };
         });
 
@@ -189,7 +197,7 @@ export default function DailyReportPage() {
 
   const handleAddDoctorVisit = async () => {
     if (!doctorForm.doctor_name.trim() || !doctorForm.hospital_name.trim()) {
-      alert('Lütfen doktor adı ve hastane adını doldurun!');
+      toast.warning('Lütfen doktor adı ve hastane adını doldurun!');
       return;
     }
 
@@ -202,9 +210,9 @@ export default function DailyReportPage() {
       setShowDoctorModal(false);
       setDoctorForm({ doctor_name: '', hospital_name: '', specialty: '', supported_product: '', notes: '' });
       fetchData();
-      alert('Hekim ziyareti başarıyla eklendi!');
+      toast.success('Hekim ziyareti başarıyla eklendi');
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'Hekim ziyareti eklenirken bir hata oluştu');
+      toast.error(error.response?.data?.detail || 'Hekim ziyareti eklenirken bir hata oluştu');
     }
   };
 
@@ -231,7 +239,7 @@ export default function DailyReportPage() {
 
   const handleCreateNewPharmacy = async () => {
     if (!newPharmacyData.name.trim()) {
-      alert('Lütfen eczane adını doldurun!');
+      toast.warning('Lütfen eczane adını doldurun!');
       return;
     }
 
@@ -243,13 +251,13 @@ export default function DailyReportPage() {
     };
 
     if (checkForbidden(newPharmacyData.city) || checkForbidden(newPharmacyData.district)) {
-      alert('Lütfen "mah.", "sk." gibi kısaltmalar kullanmayın. Sadece şehir ve semt adını yazın.');
+      toast.warning('Lütfen "mah.", "sk." gibi kısaltmalar kullanmayın. Sadece şehir ve semt adını yazın.');
       return;
     }
 
     try {
       const res = await axios.post('/pharmacies/create', newPharmacyData);
-      alert(res.data.message || 'Yeni eczane oluşturuldu!');
+      toast.success(res.data.message || 'Yeni eczane oluşturuldu');
       setSelectedPharmacy({
         id: res.data.id,
         name: res.data.name,
@@ -260,13 +268,13 @@ export default function DailyReportPage() {
       });
       setShowNewPharmacyForm(false);
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'Eczane oluşturulurken bir hata oluştu');
+      toast.error(error.response?.data?.detail || 'Eczane oluşturulurken bir hata oluştu');
     }
   };
 
   const handleAddPharmacyVisit = async () => {
     if (!selectedPharmacy) {
-      alert('Lütfen bir eczane seçin veya yeni eczane oluşturun!');
+      toast.warning('Lütfen bir eczane seçin veya yeni eczane oluşturun!');
       return;
     }
 
@@ -288,9 +296,9 @@ export default function DailyReportPage() {
       setNewPharmacyData({ name: '', city: '', district: '' });
       setVisitDetails({ product_count: '', mf_count: '', notes: '' });
       fetchData();
-      alert('Eczane ziyareti başarıyla eklendi!');
+      toast.success('Eczane ziyareti başarıyla eklendi');
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'Eczane ziyareti eklenirken bir hata oluştu');
+      toast.error(error.response?.data?.detail || 'Eczane ziyareti eklenirken bir hata oluştu');
     }
   };
 
@@ -300,8 +308,9 @@ export default function DailyReportPage() {
     try {
       await axios.delete(`/daily-visits/doctors/${id}`);
       fetchData();
+      toast.success('Ziyaret silindi');
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'Ziyaret silinirken bir hata oluştu');
+      toast.error(error.response?.data?.detail || 'Ziyaret silinirken bir hata oluştu');
     }
   };
 
@@ -311,8 +320,9 @@ export default function DailyReportPage() {
     try {
       await axios.delete(`/daily-visits/pharmacies/${id}`);
       fetchData();
+      toast.success('Ziyaret silindi');
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'Ziyaret silinirken bir hata oluştu');
+      toast.error(error.response?.data?.detail || 'Ziyaret silinirken bir hata oluştu');
     }
   };
 
@@ -342,9 +352,9 @@ export default function DailyReportPage() {
       setEditingPharmacyVisit(null);
       setEditPharmacyVisitForm({ product_count: '', mf_count: '', notes: '' });
       fetchData();
-      alert('Ziyaret başarıyla güncellendi!');
+      toast.success('Ziyaret başarıyla güncellendi');
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'Güncelleme sırasında bir hata oluştu');
+      toast.error(error.response?.data?.detail || 'Güncelleme sırasında bir hata oluştu');
     }
   };
 
@@ -447,28 +457,28 @@ export default function DailyReportPage() {
     );
   }
 
-  // Manager View
+  // Yönetici View
   if (user?.role === 'MANAGER' || user?.role === 'ADMIN') {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Günlük Rapor</h1>
-          <p className="text-gray-600 dark:text-gray-300">Çalışanların günlük ziyaret detayları</p>
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-8">
+        <div className="mb-4 sm:mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">Günlük Rapor</h1>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">Çalışanların günlük ziyaret detayları</p>
         </div>
 
         {/* Tarih Seçici ve Filtre */}
-        <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-4">
+        <div className="mb-4 sm:mb-6 bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 space-y-4">
           <DateSelector
             value={selectedDate}
             onChange={setSelectedDate}
             max={today}
           />
-          <div className="flex items-center gap-3 pt-4 border-t dark:border-gray-700">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-4 border-t dark:border-gray-700">
             <label className="text-sm font-medium text-gray-700 dark:text-gray-200">Renk Filtrele:</label>
             <select
               value={colorFilter}
               onChange={(e) => setColorFilter(e.target.value as ColorFilter)}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+              className="w-full sm:w-auto px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm sm:text-base"
             >
               <option value="all">Tümü</option>
               <option value="yellow">Sarı (0-14)</option>
@@ -478,11 +488,11 @@ export default function DailyReportPage() {
           </div>
         </div>
 
-        {/* Employee Reports */}
+        {/* Çalışan Raporları */}
         <div className="space-y-6">
           {filteredEmployeeReports.map((report) => (
             <div key={report.employee_id} className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-              {/* Employee Name Header - Colored + Clickable */}
+              {/* Çalışan İsmi Header - Colored + Clickable */}
               <div
                 className={`p-4 ${getColorClass(report.doctor_visits.length)} cursor-pointer hover:opacity-90 transition-opacity`}
                 onClick={() => {
@@ -505,7 +515,11 @@ export default function DailyReportPage() {
                     <h3 className="text-xl font-bold">{report.employee_name}</h3>
                   </div>
                   <div className="text-sm font-semibold">
-                    {report.doctor_visits.length} Hekim | {report.pharmacy_visits.length} Eczane
+                    {report.is_on_leave ? (
+                      <span className="text-green-600 dark:text-green-400 font-bold">İzinli ({report.leave_type})</span>
+                    ) : (
+                      <>{report.doctor_visits.length} Hekim | {report.pharmacy_visits.length} Eczane</>
+                    )}
                   </div>
                 </div>
               </div>
@@ -513,6 +527,14 @@ export default function DailyReportPage() {
               {/* Visit Details - Collapsible */}
               {expandedEmployees.has(report.employee_id) && (
                 <div className="p-6 space-y-6">
+                {report.is_on_leave ? (
+                  <div className="flex items-center justify-center p-8 bg-green-50 dark:bg-green-900/20 rounded-lg border-2 border-green-300 dark:border-green-700">
+                    <p className="text-lg font-bold text-green-700 dark:text-green-400">
+                      İzinli ({report.leave_type})
+                    </p>
+                  </div>
+                ) : (
+                  <>
                 {/* Hekim Ziyaretleri */}
                 <div>
                   <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
@@ -520,29 +542,31 @@ export default function DailyReportPage() {
                     Hekim Ziyaretleri
                   </h4>
                   {report.doctor_visits.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full border-collapse">
-                        <thead>
-                          <tr className="bg-blue-100 dark:bg-blue-900/40">
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Hastane</th>
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Bölüm</th>
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Hekim</th>
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Desteklenen Ürün</th>
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Notlar</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {report.doctor_visits.map((visit, idx) => (
-                            <tr key={idx} className="border-b border-blue-100 dark:border-blue-900/30 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
-                              <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{visit.hospital_name}</td>
-                              <td className="px-4 py-3 text-sm text-blue-600 dark:text-blue-400">{visit.specialty || '-'}</td>
-                              <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{visit.doctor_name}</td>
-                              <td className="px-4 py-3 text-sm text-green-600 dark:text-green-400 font-medium">{visit.supported_product || '-'}</td>
-                              <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate" title={visit.notes}>{visit.notes || '-'}</td>
+                    <div className="overflow-x-auto -mx-4 sm:mx-0">
+                      <div className="inline-block min-w-full align-middle">
+                        <table className="min-w-full border-collapse">
+                          <thead>
+                            <tr className="bg-blue-100 dark:bg-blue-900/40">
+                              <th className="w-32 sm:w-40 px-2 sm:px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Hastane</th>
+                              <th className="w-24 sm:w-32 px-2 sm:px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Bölüm</th>
+                              <th className="w-28 sm:w-36 px-2 sm:px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Hekim</th>
+                              <th className="w-28 sm:w-36 px-2 sm:px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Desteklenen Ürün</th>
+                              <th className="w-32 sm:w-48 px-2 sm:px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-blue-300 dark:border-blue-700">Notlar</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {report.doctor_visits.map((visit, idx) => (
+                              <tr key={idx} className="border-b border-blue-100 dark:border-blue-900/30 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+                                <td className="w-32 sm:w-40 px-2 sm:px-4 py-3 text-xs sm:text-sm text-gray-900 dark:text-white break-words">{visit.hospital_name}</td>
+                                <td className="w-24 sm:w-32 px-2 sm:px-4 py-3 text-xs sm:text-sm text-blue-600 dark:text-blue-400 break-words">{visit.specialty || '-'}</td>
+                                <td className="w-28 sm:w-36 px-2 sm:px-4 py-3 text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">{visit.doctor_name}</td>
+                                <td className="w-28 sm:w-36 px-2 sm:px-4 py-3 text-xs sm:text-sm text-green-600 dark:text-green-400 font-medium break-words">{visit.supported_product || '-'}</td>
+                                <td className="w-32 sm:w-48 px-2 sm:px-4 py-3 text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">{visit.notes || '-'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   ) : (
                     <p className="text-sm text-gray-500 dark:text-gray-400">Hekim ziyareti yok</p>
@@ -556,32 +580,36 @@ export default function DailyReportPage() {
                     Eczane Ziyaretleri
                   </h4>
                   {report.pharmacy_visits.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full border-collapse">
-                        <thead>
-                          <tr className="bg-green-100 dark:bg-green-900/40">
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">Eczane Adı</th>
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">Satılan Ürün Sayısı</th>
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">MF Sayısı</th>
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">Notlar</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {report.pharmacy_visits.map((visit, idx) => (
-                            <tr key={idx} className="border-b border-green-100 dark:border-green-900/30 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors">
-                              <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{visit.pharmacy_name || 'Eczane'}</td>
-                              <td className="px-4 py-3 text-sm text-purple-600 dark:text-purple-400 font-medium">{visit.product_count}</td>
-                              <td className="px-4 py-3 text-sm text-orange-600 dark:text-orange-400 font-medium">{visit.mf_count}</td>
-                              <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate" title={visit.notes}>{visit.notes || '-'}</td>
+                    <div className="overflow-x-auto -mx-4 sm:mx-0">
+                      <div className="inline-block min-w-full align-middle">
+                        <table className="min-w-full border-collapse">
+                          <thead>
+                            <tr className="bg-green-100 dark:bg-green-900/40">
+                              <th className="w-32 sm:w-48 px-2 sm:px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">Eczane Adı</th>
+                              <th className="w-24 sm:w-32 px-2 sm:px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">Satılan Ürün</th>
+                              <th className="w-20 sm:w-24 px-2 sm:px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">MF Sayısı</th>
+                              <th className="w-32 sm:w-48 px-2 sm:px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 border-b-2 border-green-300 dark:border-green-700">Notlar</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {report.pharmacy_visits.map((visit, idx) => (
+                              <tr key={idx} className="border-b border-green-100 dark:border-green-900/30 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors">
+                                <td className="w-32 sm:w-48 px-2 sm:px-4 py-3 text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">{visit.pharmacy_name || 'Eczane'}</td>
+                                <td className="w-24 sm:w-32 px-2 sm:px-4 py-3 text-xs sm:text-sm text-purple-600 dark:text-purple-400 font-medium text-center">{visit.product_count}</td>
+                                <td className="w-20 sm:w-24 px-2 sm:px-4 py-3 text-xs sm:text-sm text-orange-600 dark:text-orange-400 font-medium text-center">{visit.mf_count}</td>
+                                <td className="w-32 sm:w-48 px-2 sm:px-4 py-3 text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">{visit.notes || '-'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   ) : (
                     <p className="text-sm text-gray-500 dark:text-gray-400">Eczane ziyareti yok</p>
                   )}
                 </div>
+                  </>
+                )}
                 </div>
               )}
             </div>
@@ -600,7 +628,7 @@ export default function DailyReportPage() {
     );
   }
 
-  // Regular Employee View
+  // Çalışan View
 
   return <>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

@@ -1,9 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, memo, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from '@/lib/axios';
-import { Search, Filter, Edit, Check, X, Clock } from 'lucide-react';
+import useSWR, { mutate } from 'swr';
+import { Search, Filter, Edit, Check, X, Clock, Download } from 'lucide-react';
+import CustomDateInput from '@/components/CustomDateInput';
+import { toast } from 'react-toastify';
 
 interface PharmacyVisit {
   id: number;
@@ -20,19 +23,181 @@ interface PharmacyVisit {
   notes?: string;
 }
 
+// React.memo ile optimize edilmiş istatistik kartı
+// Mantık: Stats değişmediği sürece kart yeniden render olmaz
+// Props aynı kaldığında gereksiz re-render önlenir
+const StatCard = memo(({ label, value, color }: { label: string; value: number; color: string }) => {
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+      <p className="text-sm text-gray-600 dark:text-gray-300">{label}</p>
+      <p className={`text-3xl font-bold ${color}`}>{value}</p>
+    </div>
+  );
+});
+StatCard.displayName = 'StatCard';
+
+// React.memo ile optimize edilmiş tablo satırı
+// Mantık: Visit objesi ve user role değişmediği sürece satır yeniden render olmaz
+// Örnek: 100 eczane varsa ve filtreleme yapılırsa, değişmeyen 99 satır tekrar render olmaz!
+const PharmacyVisitRow = memo(({
+  visit,
+  userRole,
+  onApprove,
+  onEdit
+}: {
+  visit: PharmacyVisit;
+  userRole: string | undefined;
+  onApprove: (id: number) => void;
+  onEdit: (visit: PharmacyVisit) => void;
+}) => {
+  const isManager = userRole === 'MANAGER' || userRole === 'ADMIN';
+
+  return (
+    <tr className="hover:bg-gray-50 dark:hover:bg-gray-700">
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+        {visit.employee_name}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+        {visit.pharmacy_name}
+      </td>
+      <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+        {visit.pharmacy_address}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-blue-600">
+        {visit.product_count}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-purple-600">
+        {visit.mf_count}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+        {new Date(visit.visit_date).toLocaleDateString('tr-TR')}
+      </td>
+      <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+        {visit.notes || '-'}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        {isManager ? (
+          <button
+            onClick={() => onApprove(visit.id)}
+            className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium transition-all hover:opacity-80 cursor-pointer"
+            style={{
+              backgroundColor: visit.is_approved ? 'rgb(220 252 231)' : 'rgb(252 231 243)',
+              color: visit.is_approved ? 'rgb(22 101 52)' : 'rgb(157 23 77)',
+            }}
+          >
+            {visit.is_approved ? (
+              <>
+                <Check className="w-4 h-4" />
+                Onaylandı
+              </>
+            ) : (
+              <>
+                <Clock className="w-4 h-4" />
+                Onaylanmayı Bekliyor!
+              </>
+            )}
+          </button>
+        ) : (
+          <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${
+            visit.is_approved
+              ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400'
+              : 'bg-pink-100 dark:bg-pink-900/30 text-pink-800 dark:text-pink-400'
+          }`}>
+            {visit.is_approved ? (
+              <>
+                <Check className="w-4 h-4" />
+                Onaylandı
+              </>
+            ) : (
+              <>
+                <Clock className="w-4 h-4" />
+                Onaylanmayı Bekliyor!
+              </>
+            )}
+          </span>
+        )}
+      </td>
+      {isManager && (
+        <td className="px-6 py-4 whitespace-nowrap text-sm">
+          <button
+            onClick={() => onEdit(visit)}
+            className="text-blue-600 hover:text-blue-800 dark:text-blue-400"
+            title="Düzenle"
+          >
+            <Edit className="w-5 h-5" />
+          </button>
+        </td>
+      )}
+    </tr>
+  );
+});
+PharmacyVisitRow.displayName = 'PharmacyVisitRow';
+
+// SWR fetcher fonksiyonu - API çağrılarını yapar
+// Mantık: useSWR hook'una verilen URL'i bu fonksiyona gönderir, fonksiyon veriyi çeker
+// SWR otomatik olarak cache yapar, error handle eder, loading state yönetir
+const fetcher = (url: string) => axios.get(url).then(res => res.data);
+
 export default function PharmaciesPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
-  const [visits, setVisits] = useState<PharmacyVisit[]>([]);
-  const [filteredVisits, setFilteredVisits] = useState<PharmacyVisit[]>([]);
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // Filters
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
-  const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'week' | 'month' | 'year'>('month');
+  const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'week' | 'month' | 'year'>('day');
+  const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [searchPharmacy, setSearchPharmacy] = useState('');
   const [approvalFilter, setApprovalFilter] = useState<'all' | 'approved' | 'pending'>('all');
+
+  // SWR hooks - Otomatik caching, revalidation, error handling
+  // Mantık: useSWR(cache_key, fetcher_function) şeklinde kullanılır
+  // Cache key değişince otomatik olarak yeniden fetch eder
+  // Aynı cache key varsa cache'ten döner (network isteği yapmaz!)
+
+  // User verisi - Tüm sayfalarda aynı, cache'lenir
+  const { data: user } = useSWR('/employees/me', fetcher, {
+    onError: (error) => {
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+        router.push('/login');
+      }
+    },
+  });
+
+  // Employees listesi - Nadiren değişir, cache'lenir
+  const { data: employees = [] } = useSWR('/employees/', fetcher, {
+    // Employees listesi nadiren değişir, 5 dakika cache'le
+    dedupingInterval: 5 * 60 * 1000,
+  });
+
+  // Visits API URL - Filtreler değişince otomatik yeniden fetch edilir
+  const visitsUrl = `/daily-visits/pharmacies?period=${selectedPeriod}&start_date=${startDate}&end_date=${endDate}${
+    selectedEmployee !== 'all' ? `&employee_id=${selectedEmployee}` : ''
+  }`;
+
+  // Visits verisi - Filtrelere göre dinamik olarak güncellenir
+  const { data: visits = [], isLoading: visitsLoading } = useSWR(visitsUrl, fetcher, {
+    // Her 30 saniyede bir arka planda refresh (yeni ziyaretleri görmek için)
+    refreshInterval: 30000,
+    // Focus'ta revalidate - Başka sekmeye geçip geri gelince fresh data
+    revalidateOnFocus: true,
+  });
+
+  // Stats API URL - Filtreler değişince otomatik yeniden fetch edilir
+  const statsUrl = `/daily-visits/pharmacies/stats?period=${selectedPeriod}&start_date=${startDate}&end_date=${endDate}${
+    selectedEmployee !== 'all' ? `&employee_id=${selectedEmployee}` : ''
+  }`;
+
+  // Stats verisi - Visits ile aynı filtrelere sahip
+  const { data: stats = { total_visits: 0, total_mf: 0, total_products: 0, approved_count: 0, pending_count: 0 } } = useSWR(
+    statsUrl,
+    fetcher,
+    {
+      // Stats da aynı şekilde 30 saniyede bir refresh
+      refreshInterval: 30000,
+      revalidateOnFocus: true,
+    }
+  );
 
   // Edit Modal
   const [showEditModal, setShowEditModal] = useState(false);
@@ -44,90 +209,65 @@ export default function PharmaciesPage() {
     notes: ''
   });
 
-  // Stats from backend
-  const [stats, setStats] = useState({
-    total_visits: 0,
-    total_mf: 0,
-    total_products: 0,
-    approved_count: 0,
-    pending_count: 0
-  });
+  // Period değiştiğinde start ve end date'i güncelle
+  useEffect(() => {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
 
+    if (selectedPeriod === 'day') {
+      setStartDate(todayStr);
+      setEndDate(todayStr);
+    } else if (selectedPeriod === 'week') {
+      const weekAgo = new Date(today);
+      weekAgo.setDate(today.getDate() - 7);
+      setStartDate(weekAgo.toISOString().split('T')[0]);
+      setEndDate(todayStr);
+    } else if (selectedPeriod === 'month') {
+      const monthAgo = new Date(today);
+      monthAgo.setDate(today.getDate() - 30);
+      setStartDate(monthAgo.toISOString().split('T')[0]);
+      setEndDate(todayStr);
+    } else if (selectedPeriod === 'year') {
+      const yearAgo = new Date(today);
+      yearAgo.setFullYear(today.getFullYear() - 1);
+      setStartDate(yearAgo.toISOString().split('T')[0]);
+      setEndDate(todayStr);
+    }
+  }, [selectedPeriod]);
+
+  // SWR ile visits ve stats otomatik olarak fetch ediliyor
+  // Token kontrolü - SWR error handling ile yapılıyor (onError callback)
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
       router.push('/login');
-      return;
     }
-    fetchData();
-    fetchStats();
-  }, [selectedPeriod, selectedEmployee]);
+  }, [router]);
 
-  useEffect(() => {
-    applyFilters();
-  }, [visits, searchPharmacy, approvalFilter, selectedEmployee]);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const userRes = await axios.get('/employees/me');
-      setUser(userRes.data);
-
-      // Fetch employees
-      const employeesRes = await axios.get('/employees/');
-      setEmployees(employeesRes.data.filter((emp: any) => emp.is_active));
-
-      // Fetch pharmacy visits from API
-      const visitsRes = await axios.get('/daily-visits/pharmacies');
-      const apiVisits = visitsRes.data.map((visit: any) => ({
-        id: visit.id,
-        pharmacy_id: visit.pharmacy_id,
-        pharmacy_name: visit.pharmacy_name,
-        pharmacy_address: visit.pharmacy_address || '',
-        employee_name: visit.employee_name,
-        visit_date: visit.visit_date,
-        product_count: visit.product_count || 0,
-        mf_count: visit.mf_count || 0,
-        is_approved: visit.is_approved || false,
-        start_time: visit.start_time,
-        end_time: visit.end_time,
-        notes: visit.notes || ''
-      }));
-
-      setVisits(apiVisits);
-      setFilteredVisits(apiVisits);
-    } catch (error) {
-      console.error('Error:', error);
-    } finally {
-      setLoading(false);
+  // useMemo ile filtrelenmiş veriyi hesapla - infinite loop önlenir!
+  // Mantık: visits, searchPharmacy, approvalFilter değişmedikçe yeniden hesaplamaz
+  const filteredVisits = useMemo(() => {
+    if (!visits || visits.length === 0) {
+      return [];
     }
-  };
 
-  const fetchStats = async () => {
-    try {
-      const params = new URLSearchParams();
-      params.append('period', selectedPeriod);
-      if (selectedEmployee !== 'all') {
-        params.append('employee_id', selectedEmployee);
-      }
+    // Visits API'den gelen veriyi map'le (normalize et)
+    const normalizedVisits = visits.map((visit: any) => ({
+      id: visit.id,
+      pharmacy_id: visit.pharmacy_id,
+      pharmacy_name: visit.pharmacy_name,
+      pharmacy_address: visit.pharmacy_address || '',
+      employee_name: visit.employee_name,
+      visit_date: visit.visit_date,
+      product_count: visit.product_count || 0,
+      mf_count: visit.mf_count || 0,
+      is_approved: visit.is_approved || false,
+      start_time: visit.start_time,
+      end_time: visit.end_time,
+      notes: visit.notes || ''
+    }));
 
-      const statsRes = await axios.get(`/daily-visits/pharmacies/stats?${params.toString()}`);
-      setStats(statsRes.data);
-    } catch (error) {
-      console.error('Stats error:', error);
-    }
-  };
-
-  const applyFilters = () => {
-    let filtered = [...visits];
-
-    // Employee filter
-    if (selectedEmployee !== 'all') {
-      const selectedEmp = employees.find(e => e.id === parseInt(selectedEmployee));
-      if (selectedEmp) {
-        filtered = filtered.filter(v => v.employee_name === selectedEmp.full_name);
-      }
-    }
+    let filtered = [...normalizedVisits];
 
     // Pharmacy search
     if (searchPharmacy.trim()) {
@@ -143,11 +283,14 @@ export default function PharmaciesPage() {
       filtered = filtered.filter(v => !v.is_approved);
     }
 
-    setFilteredVisits(filtered);
-  };
+    return filtered;
+  }, [visits, searchPharmacy, approvalFilter]);
 
+  // Optimistic UI ile onaylama - SWR mutate kullanarak
+  // Mantık: Önce UI'ı güncelle (kullanıcı anında görür), sonra API'yi çağır
+  // API başarısız olursa SWR otomatik olarak eski veriyi geri yükler (revalidate)
   const handleApprove = async (visitId: number) => {
-    const visit = visits.find(v => v.id === visitId);
+    const visit = visits.find((v: any) => v.id === visitId);
     if (!visit) return;
 
     // Confirm dialog
@@ -160,17 +303,28 @@ export default function PharmaciesPage() {
     }
 
     try {
+      // Optimistic update - UI'ı hemen güncelle
+      mutate(
+        visitsUrl,
+        visits.map((v: any) =>
+          v.id === visitId ? { ...v, is_approved: !v.is_approved } : v
+        ),
+        false // Revalidate'i kapat, kendimiz yapacağız
+      );
+
       // Backend API çağrısı - toggle approval status
       const response = await axios.post(`/daily-visits/pharmacies/${visitId}/toggle-approval`);
 
-      // Backend'den gelen güncel is_approved değerini kullan
-      const updatedVisits = visits.map(v =>
-        v.id === visitId ? { ...v, is_approved: response.data.is_approved } : v
-      );
-      setVisits(updatedVisits);
+      // Backend'den gelen güncel veriyle SWR cache'ini güncelle
+      mutate(visitsUrl);
+      mutate(statsUrl); // Stats da güncellensin (onay sayısı değişti)
+
+      toast.success(visit.is_approved ? 'Onay geri alındı' : 'Ziyaret onaylandı');
     } catch (error) {
       console.error('Approval error:', error);
-      alert('Onay durumu güncellenirken hata oluştu. Lütfen tekrar deneyin.');
+      toast.error('Onay durumu güncellenirken hata oluştu');
+      // Hata olursa SWR otomatik olarak cache'i revalidate eder
+      mutate(visitsUrl);
     }
   };
 
@@ -185,6 +339,7 @@ export default function PharmaciesPage() {
     setShowEditModal(true);
   };
 
+  // Optimistic UI ile düzenleme - SWR mutate kullanarak
   const handleSaveEdit = async () => {
     if (!editingVisit) return;
 
@@ -200,9 +355,7 @@ export default function PharmaciesPage() {
         visit_date: editingVisit.visit_date
       };
 
-      await axios.put(`/daily-visits/pharmacies/${editingVisit.id}`, updateData);
-
-      // Güncellenen veriyi state'e uygula
+      // Optimistic update
       const updatedVisit = {
         ...editingVisit,
         pharmacy_address: editForm.pharmacy_address,
@@ -211,19 +364,80 @@ export default function PharmaciesPage() {
         notes: editForm.notes
       };
 
-      setVisits(visits.map(v => v.id === updatedVisit.id ? updatedVisit : v));
+      mutate(
+        visitsUrl,
+        visits.map((v: any) => (v.id === updatedVisit.id ? updatedVisit : v)),
+        false
+      );
+
+      await axios.put(`/daily-visits/pharmacies/${editingVisit.id}`, updateData);
+
+      // Backend'den gelen güncel veriyle cache'i güncelle
+      mutate(visitsUrl);
+      mutate(statsUrl); // Product count değişmiş olabilir
+
       setShowEditModal(false);
       setEditingVisit(null);
-      alert('Ziyaret başarıyla güncellendi!');
+      toast.success('Ziyaret başarıyla güncellendi');
     } catch (error) {
       console.error('Update error:', error);
-      alert('Ziyaret güncellenirken hata oluştu. Lütfen tekrar deneyin.');
+      toast.error('Ziyaret güncellenirken hata oluştu');
+      mutate(visitsUrl); // Hata durumunda revalidate
     }
   };
 
-  // Stats artık backend'den geliyor (stats state'inde)
+  // Export to Excel
+  const handleExportToExcel = async () => {
+    try {
+      const params = new URLSearchParams();
+      params.append('start_date', startDate);
+      params.append('end_date', endDate);
 
-  if (loading) {
+      if (selectedEmployee !== 'all') {
+        params.append('employee_id', selectedEmployee);
+      }
+
+      if (searchPharmacy.trim()) {
+        params.append('pharmacy_name', searchPharmacy.trim());
+      }
+
+      if (approvalFilter !== 'all') {
+        params.append('approval_filter', approvalFilter);
+      }
+
+      const response = await axios.get(`/daily-visits/pharmacies/export?${params.toString()}`, {
+        responseType: 'blob'
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+
+      // Backend'den gelen dosya adını kullan
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = 'eczaneziyaretleri.xlsx';
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename=(.+)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+        }
+      }
+      link.setAttribute('download', filename);
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.success('Excel dosyası başarıyla indirildi!');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Excel dosyası indirilirken hata oluştu');
+    }
+  };
+
+  // Loading state - İlk yüklenme için
+  if (!user || !employees) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-xl text-gray-600 dark:text-gray-300">Yükleniyor...</div>
@@ -233,12 +447,94 @@ export default function PharmaciesPage() {
 
   return <>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">Eczane Ziyaretleri</h1>
+      {/* Header with Export Button */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Eczane Ziyaretleri</h1>
+        <button
+          onClick={handleExportToExcel}
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+        >
+          <Download className="w-5 h-5" />
+          Excel'e Aktar
+        </button>
+      </div>
 
       {/* Filters */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Employee Filter */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6 space-y-4">
+        {/* Period Buttons */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Dönem Seçimi
+          </label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setSelectedPeriod('day')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                selectedPeriod === 'day'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              Günlük
+            </button>
+            <button
+              onClick={() => setSelectedPeriod('week')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                selectedPeriod === 'week'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              Haftalık
+            </button>
+            <button
+              onClick={() => setSelectedPeriod('month')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                selectedPeriod === 'month'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              Aylık
+            </button>
+            <button
+              onClick={() => setSelectedPeriod('year')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                selectedPeriod === 'year'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              Yıllık
+            </button>
+          </div>
+        </div>
+
+        {/* Date Picker and Other Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          {/* Start Date */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Başlangıç Tarihi
+            </label>
+            <CustomDateInput
+              value={startDate}
+              onChange={(value) => setStartDate(value)}
+            />
+          </div>
+
+          {/* End Date */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Bitiş Tarihi
+            </label>
+            <CustomDateInput
+              value={endDate}
+              onChange={(value) => setEndDate(value)}
+            />
+          </div>
+
+          {/* Çalışan Filtresi */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Çalışan
@@ -252,23 +548,6 @@ export default function PharmaciesPage() {
               {employees.map((emp) => (
                 <option key={emp.id} value={emp.id}>{emp.full_name}</option>
               ))}
-            </select>
-          </div>
-
-          {/* Period Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Dönem
-            </label>
-            <select
-              value={selectedPeriod}
-              onChange={(e) => setSelectedPeriod(e.target.value as any)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-            >
-              <option value="day">Günlük</option>
-              <option value="week">Haftalık</option>
-              <option value="month">Aylık</option>
-              <option value="year">Yıllık</option>
             </select>
           </div>
 
@@ -307,28 +586,14 @@ export default function PharmaciesPage() {
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* Summary Cards - React.memo ile optimize edilmiş */}
+      {/* Her kart sadece kendi değeri değiştiğinde render olur */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <p className="text-sm text-gray-600 dark:text-gray-300">Toplam Ziyaret</p>
-          <p className="text-3xl font-bold text-blue-600">{stats.total_visits}</p>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <p className="text-sm text-gray-600 dark:text-gray-300">Toplam Satılan Ürün</p>
-          <p className="text-3xl font-bold text-indigo-600">{stats.total_products}</p>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <p className="text-sm text-gray-600 dark:text-gray-300">Toplam MF</p>
-          <p className="text-3xl font-bold text-purple-600">{stats.total_mf}</p>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <p className="text-sm text-gray-600 dark:text-gray-300">Onaylanan</p>
-          <p className="text-3xl font-bold text-green-600">{stats.approved_count}</p>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <p className="text-sm text-gray-600 dark:text-gray-300">Onay Bekleyen</p>
-          <p className="text-3xl font-bold text-orange-600">{stats.pending_count}</p>
-        </div>
+        <StatCard label="Toplam Ziyaret" value={stats.total_visits} color="text-blue-600" />
+        <StatCard label="Toplam Satılan Ürün" value={stats.total_products} color="text-indigo-600" />
+        <StatCard label="Toplam MF" value={stats.total_mf} color="text-purple-600" />
+        <StatCard label="Onaylanan" value={stats.approved_count} color="text-green-600" />
+        <StatCard label="Onay Bekleyen" value={stats.pending_count} color="text-orange-600" />
       </div>
 
       {/* Table */}
@@ -377,83 +642,15 @@ export default function PharmaciesPage() {
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+              {/* React.memo ile optimize edilmiş satırlar - Her satır sadece kendi verisi değiştiğinde render olur */}
               {filteredVisits.map((visit) => (
-                <tr key={visit.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {visit.employee_name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                    {visit.pharmacy_name}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
-                    {visit.pharmacy_address}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-blue-600">
-                    {visit.product_count}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-purple-600">
-                    {visit.mf_count}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {new Date(visit.visit_date).toLocaleDateString('tr-TR')}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
-                    {visit.notes || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {(user?.role === 'MANAGER' || user?.role === 'ADMIN') ? (
-                      <button
-                        onClick={() => handleApprove(visit.id)}
-                        className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium transition-all hover:opacity-80 cursor-pointer"
-                        style={{
-                          backgroundColor: visit.is_approved ? 'rgb(220 252 231)' : 'rgb(252 231 243)',
-                          color: visit.is_approved ? 'rgb(22 101 52)' : 'rgb(157 23 77)',
-                        }}
-                      >
-                        {visit.is_approved ? (
-                          <>
-                            <Check className="w-4 h-4" />
-                            Onaylandı
-                          </>
-                        ) : (
-                          <>
-                            <Clock className="w-4 h-4" />
-                            Onaylanmayı Bekliyor!
-                          </>
-                        )}
-                      </button>
-                    ) : (
-                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${
-                        visit.is_approved
-                          ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400'
-                          : 'bg-pink-100 dark:bg-pink-900/30 text-pink-800 dark:text-pink-400'
-                      }`}>
-                        {visit.is_approved ? (
-                          <>
-                            <Check className="w-4 h-4" />
-                            Onaylandı
-                          </>
-                        ) : (
-                          <>
-                            <Clock className="w-4 h-4" />
-                            Onaylanmayı Bekliyor!
-                          </>
-                        )}
-                      </span>
-                    )}
-                  </td>
-                  {(user?.role === 'MANAGER' || user?.role === 'ADMIN') && (
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <button
-                        onClick={() => handleEdit(visit)}
-                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400"
-                        title="Düzenle"
-                      >
-                        <Edit className="w-5 h-5" />
-                      </button>
-                    </td>
-                  )}
-                </tr>
+                <PharmacyVisitRow
+                  key={visit.id}
+                  visit={visit}
+                  userRole={user?.role}
+                  onApprove={handleApprove}
+                  onEdit={handleEdit}
+                />
               ))}
             </tbody>
           </table>

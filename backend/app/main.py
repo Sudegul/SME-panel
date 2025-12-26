@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .config import settings
-from .database import init_db
-from .routers import (
+from app.config import settings
+from app.database import init_db
+from app.routers import (
     auth_router,
     employees_router,
     sales_router,
@@ -15,6 +15,9 @@ from .routers import (
     pharmacies_router,
     daily_visits_router,
     settings_router,
+    leave_types_router,
+    leave_requests_router,
+    annual_leave_rules_router,
 )
 
 app = FastAPI(
@@ -44,6 +47,9 @@ app.include_router(status_reports_router)
 app.include_router(pharmacies_router)
 app.include_router(daily_visits_router)
 app.include_router(settings_router)
+app.include_router(leave_types_router)
+app.include_router(leave_requests_router)
+app.include_router(annual_leave_rules_router)
 
 
 @app.on_event("startup")
@@ -77,8 +83,8 @@ def health_check():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=8000,
+        app,
+        host=settings.BACKEND_HOST,
+        port=settings.BACKEND_PORT,
         reload=True
     )
