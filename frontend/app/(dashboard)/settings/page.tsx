@@ -433,66 +433,70 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-8">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Ayarlar</h1>
-        <p className="text-gray-600 dark:text-gray-300">Sistem ayarlarını yönetin</p>
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">Ayarlar</h1>
+        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">Sistem ayarlarını yönetin</p>
       </div>
 
       {/* Tabs */}
-      <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
-        <nav className="-mb-px flex space-x-8">
+      <div className="mb-4 sm:mb-6 border-b border-gray-200 dark:border-gray-700 overflow-x-auto -mx-2 sm:mx-0">
+        <nav className="-mb-px flex space-x-4 sm:space-x-8 px-2 sm:px-0">
           <button
             onClick={() => setActiveTab('users')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+            className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap ${
               activeTab === 'users'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400'
             }`}
           >
-            <div className="flex items-center gap-2">
-              <Users className="w-5 h-5" />
-              Kullanıcı Yönetimi
+            <div className="flex items-center gap-1 sm:gap-2">
+              <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="hidden sm:inline">Kullanıcı Yönetimi</span>
+              <span className="sm:hidden">Kullanıcı</span>
             </div>
           </button>
           <button
             onClick={() => setActiveTab('colors')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+            className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap ${
               activeTab === 'colors'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400'
             }`}
           >
-            <div className="flex items-center gap-2">
-              <Palette className="w-5 h-5" />
-              Durum Raporu Renk Skalası
+            <div className="flex items-center gap-1 sm:gap-2">
+              <Palette className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="hidden sm:inline">Durum Raporu Renk Skalası</span>
+              <span className="sm:hidden">Renkler</span>
             </div>
           </button>
           <button
             onClick={() => setActiveTab('leave-types')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+            className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap ${
               activeTab === 'leave-types'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400'
             }`}
           >
-            <div className="flex items-center gap-2">
-              <Palmtree className="w-5 h-5" />
-              İzin Türleri
+            <div className="flex items-center gap-1 sm:gap-2">
+              <Palmtree className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="hidden sm:inline">İzin Türleri</span>
+              <span className="sm:hidden">İzinler</span>
             </div>
           </button>
           <button
             onClick={() => setActiveTab('annual-leave-rules')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+            className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap ${
               activeTab === 'annual-leave-rules'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400'
             }`}
           >
-            <div className="flex items-center gap-2">
-              <Calendar className="w-5 h-5" />
-              Yıllık İzin Hakları
+            <div className="flex items-center gap-1 sm:gap-2">
+              <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="hidden sm:inline">Yıllık İzin Hakları</span>
+              <span className="sm:hidden">Yıllık İzin</span>
             </div>
           </button>
         </nav>
@@ -521,137 +525,144 @@ export default function SettingsPage() {
           )}
 
           {/* Header with Add Button */}
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center gap-3">
-              <Users className="w-8 h-8 text-blue-600" />
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Kullanıcı Yönetimi</h2>
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4 sm:mb-6">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <Users className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Kullanıcı Yönetimi</h2>
             </div>
             <button
               onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm sm:text-base whitespace-nowrap"
             >
-              <UserPlus className="w-5 h-5" />
-              Yeni Kullanıcı Ekle
+              <UserPlus className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="hidden sm:inline">Yeni Kullanıcı Ekle</span>
+              <span className="sm:hidden">Kullanıcı Ekle</span>
             </button>
           </div>
 
           {/* Filter Buttons */}
-          <div className="flex gap-4 mb-6">
+          <div className="flex flex-wrap gap-2 sm:gap-4 mb-4 sm:mb-6">
             <button
               onClick={() => setFilter('active')}
-              className={`px-4 py-2 rounded-lg ${filter === 'active' ? 'bg-green-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
+              className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm ${filter === 'active' ? 'bg-green-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
             >
-              Aktif Kullanıcılar ({users.filter(u => u.is_active).length})
+              Aktif ({users.filter(u => u.is_active).length})
             </button>
             <button
               onClick={() => setFilter('inactive')}
-              className={`px-4 py-2 rounded-lg ${filter === 'inactive' ? 'bg-red-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
+              className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm ${filter === 'inactive' ? 'bg-red-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
             >
-              Pasif Kullanıcılar ({users.filter(u => !u.is_active).length})
+              Pasif ({users.filter(u => !u.is_active).length})
             </button>
             <button
               onClick={() => setFilter('all')}
-              className={`px-4 py-2 rounded-lg ${filter === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
+              className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm ${filter === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
             >
               Tümü ({users.length})
             </button>
           </div>
 
           {/* Users Table */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Durum</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Ad Soyad</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Rol</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Telefon</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">İşlemler</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredUsers.map((user) => (
-                  <tr key={user.id} className={!user.is_active ? 'opacity-60' : ''}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {user.is_active ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          <UserCheck className="w-4 h-4 mr-1" />
-                          Aktif
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          <UserX className="w-4 h-4 mr-1" />
-                          Pasif
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{user.full_name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{user.email}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {user.id === currentUser?.id || currentUser?.role === 'ADMIN' ? (
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          user.role === 'MANAGER' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300' :
-                          user.role === 'ADMIN' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300' :
-                          'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
-                        }`}>
-                          {user.role}
-                        </span>
-                      ) : (
-                        <select
-                          value={user.role}
-                          onChange={(e) => handleChangeRole(user.id, e.target.value)}
-                          className={`px-2 py-1 text-xs font-semibold rounded-full border-2 cursor-pointer ${
-                            user.role === 'MANAGER' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 border-purple-300 dark:border-purple-700' :
-                            user.role === 'ADMIN' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700' :
-                            'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-700'
-                          }`}
-                        >
-                          <option value="EMPLOYEE">EMPLOYEE</option>
-                          <option value="MANAGER">MANAGER</option>
-                          <option value="ADMIN">ADMIN</option>
-                        </select>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{user.phone || '-'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
-                      <button
-                        onClick={() => handleToggleActive(user.id, user.is_active)}
-                        disabled={user.id === currentUser?.id}
-                        className={`px-3 py-1 rounded-lg text-white ${
-                          user.id === currentUser?.id
-                            ? 'bg-gray-400 cursor-not-allowed'
-                            : user.is_active
-                            ? 'bg-red-600 hover:bg-red-700'
-                            : 'bg-green-600 hover:bg-green-700'
-                        }`}
-                      >
-                        {user.is_active ? 'Pasif Yap' : 'Aktif Yap'}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedUserId(user.id);
-                          setShowResetPasswordModal(true);
-                        }}
-                        className="px-3 py-1 rounded-lg bg-orange-600 hover:bg-orange-700 text-white inline-flex items-center gap-1"
-                      >
-                        <Key className="w-4 h-4" />
-                        Şifre Sıfırla
-                      </button>
-                      {currentUser?.role === 'MANAGER' && user.role !== 'MANAGER' && (
-                        <button
-                          onClick={() => handleEditPermissions(user)}
-                          className="px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white inline-flex items-center gap-1"
-                        >
-                          <Edit className="w-4 h-4" />
-                          Yetki Düzenle
-                        </button>
-                      )}
-                    </td>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-x-auto -mx-2 sm:mx-0">
+            <div className="inline-block min-w-full align-middle">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Durum</th>
+                    <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Ad Soyad</th>
+                    <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Email</th>
+                    <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Rol</th>
+                    <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Telefon</th>
+                    <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">İşlemler</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {filteredUsers.map((user) => (
+                    <tr key={user.id} className={!user.is_active ? 'opacity-60' : ''}>
+                      <td className="px-2 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap">
+                        {user.is_active ? (
+                          <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <UserCheck className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                            <span className="hidden sm:inline">Aktif</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            <UserX className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                            <span className="hidden sm:inline">Pasif</span>
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-2 sm:px-4 lg:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words max-w-[120px] sm:max-w-none">{user.full_name}</td>
+                      <td className="px-2 sm:px-4 lg:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-500 dark:text-gray-300 break-words max-w-[150px] sm:max-w-none">{user.email}</td>
+                      <td className="px-2 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap">
+                        {user.id === currentUser?.id || currentUser?.role === 'ADMIN' ? (
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            user.role === 'MANAGER' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300' :
+                            user.role === 'ADMIN' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300' :
+                            'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+                          }`}>
+                            {user.role}
+                          </span>
+                        ) : (
+                          <select
+                            value={user.role}
+                            onChange={(e) => handleChangeRole(user.id, e.target.value)}
+                            className={`px-2 py-1 text-xs font-semibold rounded-full border-2 cursor-pointer ${
+                              user.role === 'MANAGER' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 border-purple-300 dark:border-purple-700' :
+                              user.role === 'ADMIN' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700' :
+                              'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-700'
+                            }`}
+                          >
+                            <option value="EMPLOYEE">EMPLOYEE</option>
+                            <option value="MANAGER">MANAGER</option>
+                            <option value="ADMIN">ADMIN</option>
+                          </select>
+                        )}
+                      </td>
+                      <td className="px-2 sm:px-4 lg:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-500 dark:text-gray-300 break-words max-w-[100px] sm:max-w-none">{user.phone || '-'}</td>
+                      <td className="px-2 sm:px-4 lg:px-6 py-3 sm:py-4 text-xs sm:text-sm">
+                        <div className="flex flex-col sm:flex-row gap-1 sm:gap-2">
+                          <button
+                            onClick={() => handleToggleActive(user.id, user.is_active)}
+                            disabled={user.id === currentUser?.id}
+                            className={`px-2 sm:px-3 py-1 rounded-lg text-white whitespace-nowrap text-xs ${
+                              user.id === currentUser?.id
+                                ? 'bg-gray-400 cursor-not-allowed'
+                                : user.is_active
+                                ? 'bg-red-600 hover:bg-red-700'
+                                : 'bg-green-600 hover:bg-green-700'
+                            }`}
+                          >
+                            {user.is_active ? 'Pasif Yap' : 'Aktif Yap'}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedUserId(user.id);
+                              setShowResetPasswordModal(true);
+                            }}
+                            className="px-2 sm:px-3 py-1 rounded-lg bg-orange-600 hover:bg-orange-700 text-white inline-flex items-center justify-center gap-1 whitespace-nowrap text-xs"
+                          >
+                            <Key className="w-3 h-3 sm:w-4 sm:h-4" />
+                            <span className="hidden lg:inline">Şifre Sıfırla</span>
+                            <span className="lg:hidden">Şifre</span>
+                          </button>
+                          {currentUser?.role === 'MANAGER' && user.role !== 'MANAGER' && (
+                            <button
+                              onClick={() => handleEditPermissions(user)}
+                              className="px-2 sm:px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white inline-flex items-center justify-center gap-1 whitespace-nowrap text-xs"
+                            >
+                              <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden lg:inline">Yetki Düzenle</span>
+                              <span className="lg:hidden">Yetki</span>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </>
       )}
@@ -659,33 +670,33 @@ export default function SettingsPage() {
       {/* Color Scale Tab */}
       {activeTab === 'colors' && (
         <div>
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4 sm:mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Durum Raporu Renk Skalası</h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Hekim ziyaretlerine göre renk skalası ayarlarını belirleyin</p>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2">Durum Raporu Renk Skalası</h2>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Hekim ziyaretlerine göre renk skalası ayarlarını belirleyin</p>
             </div>
             {!isEditingScales ? (
               <button
                 onClick={() => setIsEditingScales(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 whitespace-nowrap text-sm sm:text-base"
               >
-                <Edit className="w-5 h-5 inline mr-2" />
+                <Edit className="w-4 h-4 sm:w-5 sm:h-5" />
                 Düzenle
               </button>
             ) : (
-              <div className="space-x-2">
+              <div className="flex gap-2">
                 <button
                   onClick={() => {
                     setEditingScales(JSON.parse(JSON.stringify(colorScales)));
                     setIsEditingScales(false);
                   }}
-                  className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+                  className="px-3 sm:px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm sm:text-base"
                 >
                   İptal
                 </button>
                 <button
                   onClick={handleSaveColorScales}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  className="px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm sm:text-base"
                 >
                   Kaydet
                 </button>
@@ -763,10 +774,10 @@ export default function SettingsPage() {
       {/* Leave Types Tab */}
       {activeTab === 'leave-types' && (
         <div>
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4 sm:mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">İzin Türleri Yönetimi</h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Şirketteki tüm izin türlerini yönetin</p>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2">İzin Türleri Yönetimi</h2>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Şirketteki tüm izin türlerini yönetin</p>
             </div>
             <button
               onClick={() => {
@@ -774,117 +785,122 @@ export default function SettingsPage() {
                 setLeaveTypeForm({ name: '', max_days: 0, is_paid: true, gender_restriction: 'NONE', description: '' });
                 setShowLeaveTypeModal(true);
               }}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+              className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 text-sm sm:text-base whitespace-nowrap"
             >
-              <UserPlus className="w-5 h-5" />
-              Yeni İzin Türü Ekle
+              <UserPlus className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="hidden sm:inline">Yeni İzin Türü Ekle</span>
+              <span className="sm:hidden">İzin Türü Ekle</span>
             </button>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-x-auto -mx-2 sm:mx-0">
+            <div className="inline-block min-w-full align-middle">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Durum</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">İzin Adı</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Max Gün</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Ücretli</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Cinsiyet Kısıtı</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Açıklama</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">İşlemler</th>
+                  <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Durum</th>
+                  <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">İzin Adı</th>
+                  <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Max Gün</th>
+                  <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Ücretli</th>
+                  <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Cinsiyet Kısıtı</th>
+                  <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Açıklama</th>
+                  <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">İşlemler</th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {leaveTypes.map((leaveType) => (
                   <tr key={leaveType.id} className={!leaveType.is_active ? 'opacity-60' : ''}>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-2 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap">
                       {leaveType.is_active ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                           Aktif
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                           Pasif
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{leaveType.name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{leaveType.max_days} gün</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-2 sm:px-4 lg:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words max-w-[120px] sm:max-w-none">{leaveType.name}</td>
+                    <td className="px-2 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500 dark:text-gray-300">{leaveType.max_days} gün</td>
+                    <td className="px-2 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap">
                       {leaveType.is_paid ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                           Ücretli
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                           Ücretsiz
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                    <td className="px-2 sm:px-4 lg:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-500 dark:text-gray-300 break-words max-w-[100px] sm:max-w-none">
                       {getGenderRestrictionLabel(leaveType.gender_restriction)}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300 max-w-xs truncate">
+                    <td className="px-2 sm:px-4 lg:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-500 dark:text-gray-300 max-w-[150px] sm:max-w-xs break-words">
                       {leaveType.description || '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
-                      <button
-                        onClick={() => {
-                          setEditingLeaveType(leaveType);
-                          setLeaveTypeForm({
-                            name: leaveType.name,
-                            max_days: leaveType.max_days,
-                            is_paid: leaveType.is_paid,
-                            gender_restriction: leaveType.gender_restriction,
-                            description: leaveType.description || ''
-                          });
-                          setShowLeaveTypeModal(true);
-                        }}
-                        className="px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
-                      >
-                        <Edit className="w-4 h-4 inline" />
-                      </button>
-                      {leaveType.name === 'Yıllık İzin' ? (
+                    <td className="px-2 sm:px-4 lg:px-6 py-3 sm:py-4 text-xs sm:text-sm">
+                      <div className="flex flex-col sm:flex-row gap-1 sm:gap-2">
                         <button
-                          disabled
-                          className="px-3 py-1 rounded-lg text-white bg-gray-400 cursor-not-allowed"
-                          title="Yıllık İzin türü pasif yapılamaz"
+                          onClick={() => {
+                            setEditingLeaveType(leaveType);
+                            setLeaveTypeForm({
+                              name: leaveType.name,
+                              max_days: leaveType.max_days,
+                              is_paid: leaveType.is_paid,
+                              gender_restriction: leaveType.gender_restriction,
+                              description: leaveType.description || ''
+                            });
+                            setShowLeaveTypeModal(true);
+                          }}
+                          className="px-2 sm:px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs whitespace-nowrap"
                         >
-                          {leaveType.is_active ? 'Pasif Yap' : 'Aktif Yap'}
+                          <Edit className="w-3 h-3 sm:w-4 sm:h-4 inline" />
                         </button>
-                      ) : (
-                        <button
-                          onClick={() => handleToggleLeaveTypeActive(leaveType.id)}
-                          className={`px-3 py-1 rounded-lg text-white ${
-                            leaveType.is_active
-                              ? 'bg-orange-600 hover:bg-orange-700'
-                              : 'bg-green-600 hover:bg-green-700'
-                          }`}
-                        >
-                          {leaveType.is_active ? 'Pasif Yap' : 'Aktif Yap'}
-                        </button>
-                      )}
-                      {leaveType.name === 'Yıllık İzin' ? (
-                        <button
-                          disabled
-                          className="px-3 py-1 rounded-lg text-white bg-gray-400 cursor-not-allowed"
-                          title="Yıllık İzin türü silinemez"
-                        >
-                          Sil
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleDeleteLeaveType(leaveType.id)}
-                          className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white"
-                        >
-                          Sil
-                        </button>
-                      )}
+                        {leaveType.name === 'Yıllık İzin' ? (
+                          <button
+                            disabled
+                            className="px-2 sm:px-3 py-1 rounded-lg text-white bg-gray-400 cursor-not-allowed text-xs whitespace-nowrap"
+                            title="Yıllık İzin türü pasif yapılamaz"
+                          >
+                            {leaveType.is_active ? 'Pasif' : 'Aktif'}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleToggleLeaveTypeActive(leaveType.id)}
+                            className={`px-2 sm:px-3 py-1 rounded-lg text-white text-xs whitespace-nowrap ${
+                              leaveType.is_active
+                                ? 'bg-orange-600 hover:bg-orange-700'
+                                : 'bg-green-600 hover:bg-green-700'
+                            }`}
+                          >
+                            {leaveType.is_active ? 'Pasif' : 'Aktif'}
+                          </button>
+                        )}
+                        {leaveType.name === 'Yıllık İzin' ? (
+                          <button
+                            disabled
+                            className="px-2 sm:px-3 py-1 rounded-lg text-white bg-gray-400 cursor-not-allowed text-xs whitespace-nowrap"
+                            title="Yıllık İzin türü silinemez"
+                          >
+                            Sil
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleDeleteLeaveType(leaveType.id)}
+                            className="px-2 sm:px-3 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs whitespace-nowrap"
+                          >
+                            Sil
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
 
           <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-400 p-4 rounded-lg">
@@ -907,36 +923,36 @@ export default function SettingsPage() {
       {/* Annual Leave Rules Tab */}
       {activeTab === 'annual-leave-rules' && (
         <div>
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4 sm:mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Yıllık İzin Hakkı Kuralları</h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2">Yıllık İzin Hakkı Kuralları</h2>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                 Çalışma yılına göre yıllık izin hakkı günlerini belirleyin
               </p>
             </div>
             {!isEditingRules ? (
               <button
                 onClick={() => setIsEditingRules(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 whitespace-nowrap text-sm sm:text-base"
                 disabled={currentUser?.role !== 'MANAGER'}
               >
-                <Edit className="w-5 h-5" />
+                <Edit className="w-4 h-4 sm:w-5 sm:h-5" />
                 Düzenle
               </button>
             ) : (
-              <div className="space-x-2">
+              <div className="flex gap-2">
                 <button
                   onClick={() => {
                     setEditingRules(JSON.parse(JSON.stringify(annualLeaveRules)));
                     setIsEditingRules(false);
                   }}
-                  className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+                  className="px-3 sm:px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm sm:text-base"
                 >
                   İptal
                 </button>
                 <button
                   onClick={handleSaveAnnualLeaveRules}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  className="px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm sm:text-base"
                 >
                   Kaydet
                 </button>
@@ -944,51 +960,53 @@ export default function SettingsPage() {
             )}
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Çalışma Yılı
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Hak Edilen Gün Sayısı
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {(isEditingRules ? editingRules : annualLeaveRules)
-                  .sort((a, b) => a.year_of_service - b.year_of_service)
-                  .map((rule, index) => (
-                    <tr key={rule.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">
-                          {rule.year_of_service}. Yıl
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {isEditingRules ? (
-                          <input
-                            type="number"
-                            min="0"
-                            value={rule.days_entitled}
-                            onChange={(e) => {
-                              const updated = [...editingRules];
-                              updated[index].days_entitled = parseInt(e.target.value) || 0;
-                              setEditingRules(updated);
-                            }}
-                            className="w-24 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-                          />
-                        ) : (
-                          <span className="text-sm text-gray-900 dark:text-white">
-                            {rule.days_entitled} gün
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-x-auto -mx-2 sm:mx-0">
+            <div className="inline-block min-w-full align-middle">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Çalışma Yılı
+                    </th>
+                    <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Hak Edilen Gün Sayısı
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {(isEditingRules ? editingRules : annualLeaveRules)
+                    .sort((a, b) => a.year_of_service - b.year_of_service)
+                    .map((rule, index) => (
+                      <tr key={rule.id}>
+                        <td className="px-2 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap">
+                          <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">
+                            {rule.year_of_service}. Yıl
                           </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="px-2 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap">
+                          {isEditingRules ? (
+                            <input
+                              type="number"
+                              min="0"
+                              value={rule.days_entitled}
+                              onChange={(e) => {
+                                const updated = [...editingRules];
+                                updated[index].days_entitled = parseInt(e.target.value) || 0;
+                                setEditingRules(updated);
+                              }}
+                              className="w-20 sm:w-24 px-2 sm:px-3 py-1 sm:py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-xs sm:text-sm"
+                            />
+                          ) : (
+                            <span className="text-xs sm:text-sm text-gray-900 dark:text-white">
+                              {rule.days_entitled} gün
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-400 p-4 rounded-lg">
