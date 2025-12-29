@@ -5,11 +5,11 @@ from ..database import Base
 
 
 class Sale(Base):
-    __tablename__ = "demo_sales"
+    __tablename__ = "sales"
 
     id = Column(Integer, primary_key=True, index=True)
-    employee_id = Column(Integer, ForeignKey("demo_employees.id"), nullable=False)
-    pharmacy_id = Column(Integer, ForeignKey("demo_pharmacies.id"), nullable=True)
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+    pharmacy_id = Column(Integer, ForeignKey("pharmacies.id"), nullable=True)
     product_name = Column(String, nullable=False)
     quantity = Column(Integer, nullable=False, default=1)
     unit_price = Column(Numeric(10, 2), nullable=True)

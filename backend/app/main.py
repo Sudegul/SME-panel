@@ -1,24 +1,49 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import settings
-from app.database import init_db
-from app.routers import (
-    auth_router,
-    employees_router,
-    sales_router,
-    goals_router,
-    reports_router,
-    dashboard_router,
-    weekly_programs_router,
-    status_reports_router,
-    pharmacies_router,
-    daily_visits_router,
-    settings_router,
-    leave_types_router,
-    leave_requests_router,
-    annual_leave_rules_router,
-)
+try:
+    from app.config import settings
+    from app.database import init_db
+    from app.routers import (
+        auth_router,
+        employees_router,
+        sales_router,
+        goals_router,
+        reports_router,
+        dashboard_router,
+        weekly_programs_router,
+        status_reports_router,
+        pharmacies_router,
+        daily_visits_router,
+        settings_router,
+        leave_types_router,
+        leave_requests_router,
+        annual_leave_rules_router,
+    )
+except ImportError:
+    # For direct execution from IDE
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+
+    from app.config import settings
+    from app.database import init_db
+    from app.routers import (
+        auth_router,
+        employees_router,
+        sales_router,
+        goals_router,
+        reports_router,
+        dashboard_router,
+        weekly_programs_router,
+        status_reports_router,
+        pharmacies_router,
+        daily_visits_router,
+        settings_router,
+        leave_types_router,
+        leave_requests_router,
+        annual_leave_rules_router,
+    )
 
 app = FastAPI(
     title="SMA Panel API",
@@ -83,7 +108,7 @@ def health_check():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
-        app,
+        "app.main:app",
         host=settings.BACKEND_HOST,
         port=settings.BACKEND_PORT,
         reload=True

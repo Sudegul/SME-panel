@@ -18,7 +18,7 @@ class Gender(str, enum.Enum):
 
 
 class Employee(Base):
-    __tablename__ = "demo_employees"
+    __tablename__ = "employees"
 
     id = Column(Integer, primary_key=True, index=True)
     full_name = Column(String, nullable=False)

@@ -449,7 +449,12 @@ export default function PharmaciesPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header with Export Button */}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Eczane Ziyaretleri</h1>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Eczane Ziyaretleri</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Tüm eczane ziyaret kayıtları - Günlük rapor sayfasından eklenen ziyaretler burada görünür
+          </p>
+        </div>
         <button
           onClick={handleExportToExcel}
           className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"

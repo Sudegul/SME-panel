@@ -5,7 +5,7 @@ from ..database import Base
 
 
 class Doctor(Base):
-    __tablename__ = "demo_doctors"
+    __tablename__ = "doctors"
 
     id = Column(Integer, primary_key=True, index=True)
     full_name = Column(String, nullable=False, index=True)  # Demo veride 'full_name'
