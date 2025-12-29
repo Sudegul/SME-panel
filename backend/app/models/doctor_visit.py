@@ -6,10 +6,10 @@ from ..database import Base
 
 class DoctorVisit(Base):
     """Günlük hekim ziyaretleri - Her gün kaç hekim ziyaret edildi"""
-    __tablename__ = "demo_doctor_visits"
+    __tablename__ = "doctor_visits"
 
     id = Column(Integer, primary_key=True, index=True)
-    employee_id = Column(Integer, ForeignKey("demo_employees.id"), nullable=False, index=True)
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False, index=True)
     visit_date = Column(Date, nullable=False, index=True)  # Hangi gün
 
     # Hekim bilgileri

@@ -61,6 +61,9 @@ export default function DailyReportPage() {
   const [doctorVisits, setDoctorVisits] = useState<DoctorVisit[]>([]);
   const [pharmacyVisits, setPharmacyVisits] = useState<PharmacyVisit[]>([]);
   const [colorScales, setColorScales] = useState<ColorScale[]>([]);
+  const [isOnLeaveToday, setIsOnLeaveToday] = useState<any>(null);
+  const [showLeaveWarning, setShowLeaveWarning] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'doctor' | 'pharmacy' | null>(null);
 
   // Yönetici view states
   const [employeeReports, setEmployeeReports] = useState<EmployeeDailyReport[]>([]);
@@ -182,17 +185,49 @@ export default function DailyReportPage() {
         setEmployeeReports(sortedReports);
       } else {
         // Regular employee: Fetch own visits
-        const doctorRes = await axios.get('/daily-visits/doctors', { params: { visit_date: selectedDate } });
-        setDoctorVisits(doctorRes.data);
+        const [doctorRes, pharmacyRes, leaveStatusRes] = await Promise.all([
+          axios.get('/daily-visits/doctors', { params: { visit_date: selectedDate } }),
+          axios.get('/daily-visits/pharmacies', { params: { visit_date: selectedDate } }),
+          axios.get('/leave-requests/my-leave-status', { params: { check_date: selectedDate } })
+        ]);
 
-        const pharmacyRes = await axios.get('/daily-visits/pharmacies', { params: { visit_date: selectedDate } });
+        setDoctorVisits(doctorRes.data);
         setPharmacyVisits(pharmacyRes.data);
+        setIsOnLeaveToday(leaveStatusRes.data);
       }
     } catch (error) {
       console.error('Error:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleOpenDoctorModal = () => {
+    if (isOnLeaveToday?.is_on_leave) {
+      setPendingAction('doctor');
+      setShowLeaveWarning(true);
+    } else {
+      setShowDoctorModal(true);
+    }
+  };
+
+  const handleOpenPharmacyModal = () => {
+    if (isOnLeaveToday?.is_on_leave) {
+      setPendingAction('pharmacy');
+      setShowLeaveWarning(true);
+    } else {
+      setShowPharmacyModal(true);
+    }
+  };
+
+  const handleProceedWithLeaveWarning = () => {
+    setShowLeaveWarning(false);
+    if (pendingAction === 'doctor') {
+      setShowDoctorModal(true);
+    } else if (pendingAction === 'pharmacy') {
+      setShowPharmacyModal(true);
+    }
+    setPendingAction(null);
   };
 
   const handleAddDoctorVisit = async () => {
@@ -257,7 +292,7 @@ export default function DailyReportPage() {
 
     try {
       const res = await axios.post('/pharmacies/create', newPharmacyData);
-      toast.success(res.data.message || 'Yeni eczane oluşturuldu');
+      toast.success('Eczane oluşturuldu! Şimdi ziyaret detaylarını doldurun.');
       setSelectedPharmacy({
         id: res.data.id,
         name: res.data.name,
@@ -267,6 +302,8 @@ export default function DailyReportPage() {
         is_approved: false
       });
       setShowNewPharmacyForm(false);
+      // Ziyaret detayları formuna odaklan
+      setPharmacySearchResults([]);
     } catch (error: any) {
       toast.error(error.response?.data?.detail || 'Eczane oluşturulurken bir hata oluştu');
     }
@@ -713,14 +750,14 @@ export default function DailyReportPage() {
 
         <div className="mb-6 flex gap-4">
           <button
-            onClick={() => setShowDoctorModal(true)}
+            onClick={handleOpenDoctorModal}
             className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-lg"
           >
             <Stethoscope className="w-5 h-5" />
             Hekim Ziyareti Ekle
           </button>
           <button
-            onClick={() => setShowPharmacyModal(true)}
+            onClick={handleOpenPharmacyModal}
             className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-lg"
           >
             <Pill className="w-5 h-5" />
@@ -771,8 +808,20 @@ export default function DailyReportPage() {
               </div>
             </div>
           ) : (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center text-gray-500 dark:text-gray-400">
-              Henüz hekim ziyareti eklenmemiş
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
+              {isOnLeaveToday?.is_on_leave ? (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="text-5xl">🏖️</div>
+                  <p className="text-lg font-semibold text-green-600 dark:text-green-400">
+                    Bugün İzinlisiniz
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {isOnLeaveToday.leave_type}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-gray-500 dark:text-gray-400">Henüz hekim ziyareti eklenmemiş</p>
+              )}
             </div>
           )}
         </div>
@@ -829,8 +878,20 @@ export default function DailyReportPage() {
               </div>
             </div>
           ) : (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center text-gray-500 dark:text-gray-400">
-              Henüz eczane ziyareti eklenmemiş
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
+              {isOnLeaveToday?.is_on_leave ? (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="text-5xl">🏖️</div>
+                  <p className="text-lg font-semibold text-green-600 dark:text-green-400">
+                    Bugün İzinlisiniz
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {isOnLeaveToday.leave_type}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-gray-500 dark:text-gray-400">Henüz eczane ziyareti eklenmemiş</p>
+              )}
             </div>
           )}
         </div>
@@ -979,7 +1040,12 @@ export default function DailyReportPage() {
 
                   {/* Ziyaret Detayları Formu */}
                   <div className="border-2 border-blue-500 rounded-lg p-4 bg-blue-50 dark:bg-blue-900/20 space-y-3">
-                    <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Ziyaret Detayları</h3>
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="font-semibold text-gray-900 dark:text-white">📝 Ziyaret Detaylarını Doldurun</h3>
+                    </div>
+                    <p className="text-sm text-blue-800 dark:text-blue-200 mb-3">
+                      Eczane seçildi! Şimdi bu eczaneye yaptığınız ziyaretin detaylarını girin.
+                    </p>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1242,6 +1308,41 @@ export default function DailyReportPage() {
                   Kaydet
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* İzin Uyarı Modalı */}
+      {showLeaveWarning && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="text-5xl">🏖️</div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Bugün İzinlisiniz</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{isOnLeaveToday?.leave_type}</p>
+              </div>
+            </div>
+            <p className="text-gray-700 dark:text-gray-300 mb-6">
+              Bugün izinlisiniz. Veri girmek istediğinize emin misiniz?
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setShowLeaveWarning(false);
+                  setPendingAction(null);
+                }}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleProceedWithLeaveWarning}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Devam Et
+              </button>
             </div>
           </div>
         </div>

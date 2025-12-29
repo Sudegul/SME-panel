@@ -244,7 +244,7 @@ export default function ReportsPage() {
           >
             <div className="flex items-center gap-2">
               <FileSpreadsheet className="w-5 h-5" />
-              Günlük Raporlar
+              Ziyaret Raporları
             </div>
           </button>
           <button
@@ -293,7 +293,7 @@ export default function ReportsPage() {
       {/* Daily Reports Section */}
       {activeCategory === 'daily-reports' && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Günlük Raporlar</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Ziyaret Raporları</h2>
 
           <div className="space-y-6 mb-8">
             {/* Period Selection */}

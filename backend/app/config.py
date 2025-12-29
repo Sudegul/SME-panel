@@ -1,5 +1,7 @@
 from pydantic_settings import BaseSettings
 from typing import Optional
+import os
+from pathlib import Path
 
 
 class Settings(BaseSettings):
@@ -8,7 +10,7 @@ class Settings(BaseSettings):
     MYSQL_PORT: int = 5432
     MYSQL_USER: str = "postgres"
     MYSQL_PASSWORD: str = ""
-    MYSQL_DB: str = "demo_2_sma_panel"
+    MYSQL_DB: str = "postgres"
 
     @property
     def DATABASE_URL(self) -> str:
@@ -22,9 +24,16 @@ class Settings(BaseSettings):
     # CORS
     BACKEND_CORS_ORIGINS: list = ["http://localhost:3000", "http://localhost:8000"]
 
+    # Server
+    BACKEND_HOST: str = "0.0.0.0"
+    BACKEND_PORT: int = 8000
+
     class Config:
-        env_file = ".env"
+        # .env dosyasının tam yolunu belirt
+        env_file = str(Path(__file__).parent.parent / ".env")
+        env_file_encoding = 'utf-8'
         case_sensitive = True
+        extra = "allow"
 
 
 settings = Settings()

@@ -549,21 +549,23 @@ def cancel_leave_request(
     )
 
 
-@router.get("/my-leave-status-today")
-def check_if_on_leave_today(
+@router.get("/my-leave-status")
+def check_my_leave_status(
+    check_date: Optional[date] = None,
     db: Session = Depends(get_db),
     current_user: Employee = Depends(get_current_user)
 ):
     """
-    Çalışanın bugün izinli olup olmadığını kontrol et
+    Çalışanın belirli bir tarihte izinli olup olmadığını kontrol et
+    check_date verilmezse bugünü kontrol eder
     """
-    today = date.today()
+    target_date = check_date if check_date else date.today()
 
     leave = db.query(LeaveRequest).filter(
         LeaveRequest.employee_id == current_user.id,
         LeaveRequest.status == LeaveRequestStatus.APPROVED,
-        LeaveRequest.start_date <= today,
-        LeaveRequest.end_date >= today
+        LeaveRequest.start_date <= target_date,
+        LeaveRequest.end_date >= target_date
     ).first()
 
     if leave:
@@ -788,20 +790,52 @@ def edit_approved_leave_dates(
 
 
 @router.get("/my-leave-status-today")
-def check_if_on_leave_today(
+def check_my_leave_status_today(
     db: Session = Depends(get_db),
     current_user: Employee = Depends(get_current_user)
 ):
     """
     Çalışanın bugün izinli olup olmadığını kontrol et
     """
-    today = date.today()
+    target_date = date.today()
 
     leave = db.query(LeaveRequest).filter(
         LeaveRequest.employee_id == current_user.id,
         LeaveRequest.status == LeaveRequestStatus.APPROVED,
-        LeaveRequest.start_date <= today,
-        LeaveRequest.end_date >= today
+        LeaveRequest.start_date <= target_date,
+        LeaveRequest.end_date >= target_date
+    ).first()
+
+    if leave:
+        leave_type = db.query(LeaveType).filter(LeaveType.id == leave.leave_type_id).first()
+        return {
+            "is_on_leave": True,
+            "leave_type": leave_type.name if leave_type else "Bilinmeyen",
+            "start_date": leave.start_date,
+            "end_date": leave.end_date,
+            "return_to_work_date": leave.return_to_work_date
+        }
+
+    return {"is_on_leave": False}
+
+
+@router.get("/my-leave-status")
+def check_my_leave_status(
+    check_date: Optional[date] = None,
+    db: Session = Depends(get_db),
+    current_user: Employee = Depends(get_current_user)
+):
+    """
+    Çalışanın belirli bir tarihte izinli olup olmadığını kontrol et
+    check_date verilmezse bugünü kontrol eder
+    """
+    target_date = check_date if check_date else date.today()
+
+    leave = db.query(LeaveRequest).filter(
+        LeaveRequest.employee_id == current_user.id,
+        LeaveRequest.status == LeaveRequestStatus.APPROVED,
+        LeaveRequest.start_date <= target_date,
+        LeaveRequest.end_date >= target_date
     ).first()
 
     if leave:
@@ -923,7 +957,6 @@ def export_approved_leaves(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
-
 
 
 @router.get("/employees-on-leave")

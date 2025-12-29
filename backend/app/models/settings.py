@@ -5,7 +5,7 @@ from ..database import Base
 
 class VisitColorScale(Base):
     """Durum raporu renk skalası ayarları"""
-    __tablename__ = "demo_visit_color_scale"
+    __tablename__ = "visit_color_scale"
 
     id = Column(Integer, primary_key=True, index=True)
     color = Column(String(20), nullable=False, unique=True)  # 'yellow', 'orange', 'green'

@@ -8,7 +8,7 @@ class LeaveBalance(Base):
     __tablename__ = "leave_balances"
 
     id = Column(Integer, primary_key=True, index=True)
-    employee_id = Column(Integer, ForeignKey("demo_employees.id"), nullable=False)
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
     leave_type_id = Column(Integer, ForeignKey("leave_types.id"), nullable=False)
     year = Column(Integer, nullable=False)  # Hangi yıl
     total_days = Column(Integer, nullable=False, default=0)  # Toplam hak

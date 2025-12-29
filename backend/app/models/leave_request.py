@@ -16,7 +16,7 @@ class LeaveRequest(Base):
     __tablename__ = "leave_requests"
 
     id = Column(Integer, primary_key=True, index=True)
-    employee_id = Column(Integer, ForeignKey("demo_employees.id"), nullable=False)
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
     leave_type_id = Column(Integer, ForeignKey("leave_types.id"), nullable=False)
 
     # Tarihler
@@ -33,7 +33,7 @@ class LeaveRequest(Base):
     rejection_reason = Column(Text, nullable=True)  # Red nedeni (manager tarafından)
 
     # Onay bilgileri
-    approved_by = Column(Integer, ForeignKey("demo_employees.id"), nullable=True)  # Kim onayladı
+    approved_by = Column(Integer, ForeignKey("employees.id"), nullable=True)  # Kim onayladı
     approved_at = Column(DateTime, nullable=True)  # Ne zaman onaylandı
 
     # Tarihler

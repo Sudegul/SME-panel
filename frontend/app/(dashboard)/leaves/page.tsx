@@ -78,6 +78,8 @@ export default function LeavesPage() {
   const [showPastDateWarning, setShowPastDateWarning] = useState(false);
   const [showCancelPastLeaveWarning, setShowCancelPastLeaveWarning] = useState(false);
   const [pendingCancelId, setPendingCancelId] = useState<number | null>(null);
+  const [showPastDateApprovalWarning, setShowPastDateApprovalWarning] = useState(false);
+  const [pendingApprovalId, setPendingApprovalId] = useState<number | null>(null);
 
   // Onaylanan izinler için filtreler
   const [periodFilter, setPeriodFilter] = useState<'all' | 'monthly' | 'yearly'>('all');
@@ -159,17 +161,15 @@ export default function LeavesPage() {
       return;
     }
 
-    // Geçmiş tarih kontrolü - sadece çalışanlar için
-    if (!isManager) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const requestStartDate = new Date(startDate);
-      requestStartDate.setHours(0, 0, 0, 0);
+    // Geçmiş tarih kontrolü - tüm kullanıcılar için uyarı göster
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const requestStartDate = new Date(startDate);
+    requestStartDate.setHours(0, 0, 0, 0);
 
-      if (requestStartDate < today) {
-        setShowPastDateWarning(true);
-        return;
-      }
+    if (requestStartDate < today) {
+      setShowPastDateWarning(true);
+      return;
     }
 
     await submitLeaveRequest();
@@ -201,6 +201,27 @@ export default function LeavesPage() {
   };
 
   const handleApproveRequest = async (requestId: number, approved: boolean) => {
+    // Onaylama işleminde geçmiş tarih kontrolü
+    if (approved) {
+      const leave = allRequests.find(r => r.id === requestId);
+      if (leave) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const leaveStartDate = new Date(leave.start_date);
+        leaveStartDate.setHours(0, 0, 0, 0);
+
+        if (leaveStartDate < today) {
+          setPendingApprovalId(requestId);
+          setShowPastDateApprovalWarning(true);
+          return;
+        }
+      }
+    }
+
+    await performApproveRequest(requestId, approved);
+  };
+
+  const performApproveRequest = async (requestId: number, approved: boolean) => {
     try {
       await axios.post(`/leave-requests/${requestId}/approve`, {
         approved,
@@ -210,6 +231,8 @@ export default function LeavesPage() {
       toast.success(approved ? 'İzin talebi onaylandı' : 'İzin talebi reddedildi');
       setApprovingRequest(null);
       setRejectReason('');
+      setShowPastDateApprovalWarning(false);
+      setPendingApprovalId(null);
       fetchData();
     } catch (error: any) {
       console.error('İşlem sırasında hata:', error);
@@ -1063,10 +1086,10 @@ export default function LeavesPage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6">
             <div className="flex items-center gap-3 mb-4">
               <AlertCircle className="w-8 h-8 text-yellow-600" />
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Geçmiş Tarih Uyarısı</h3>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Uyarı</h3>
             </div>
             <p className="text-gray-700 dark:text-gray-300 mb-6">
-              Geçmiş tarih için izin talebi oluşturuyorsunuz. Devam etmek istiyor musunuz?
+              Geçmiş tarihli izin talebi oluşturuyorsunuz. Devam etmek istiyor musunuz?
             </p>
             <div className="flex gap-3">
               <button
@@ -1094,10 +1117,10 @@ export default function LeavesPage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6">
             <div className="flex items-center gap-3 mb-4">
               <AlertCircle className="w-8 h-8 text-red-600" />
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Geçmiş Tarih İptal Uyarısı</h3>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">⚠️ Uyarı</h3>
             </div>
             <p className="text-gray-700 dark:text-gray-300 mb-6">
-              Geçmiş tarihte onaylanıp kullanılmış bir izni iptal ediyorsunuz. Bu işlem izin bakiyesini geri iade edecektir. Devam etmek istiyor musunuz?
+              <strong>Geçmişte onaylanan izini siliyorsunuz.</strong> Devam ettiğiniz taktirde çalışanın izin hakkı güncellenecektir.
             </p>
             <div className="flex gap-3">
               <button
@@ -1117,7 +1140,7 @@ export default function LeavesPage() {
                 }}
                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
               >
-                Devam Et ve İptal Et
+                Devam Et
               </button>
             </div>
           </div>
@@ -1163,6 +1186,42 @@ export default function LeavesPage() {
                   Reddet
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Geçmiş Tarih Uyarı Modal - İzin Onaylama */}
+      {showPastDateApprovalWarning && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <AlertCircle className="w-8 h-8 text-yellow-600" />
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Uyarı</h3>
+            </div>
+            <p className="text-gray-700 dark:text-gray-300 mb-6">
+              Geçmiş tarihli izin talebi onaylıyorsunuz. Devam etmek istiyor musunuz?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowPastDateApprovalWarning(false);
+                  setPendingApprovalId(null);
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                İptal
+              </button>
+              <button
+                onClick={() => {
+                  if (pendingApprovalId) {
+                    performApproveRequest(pendingApprovalId, true);
+                  }
+                }}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Devam Et
+              </button>
             </div>
           </div>
         </div>

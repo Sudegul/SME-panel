@@ -6,11 +6,11 @@ from ..database import Base
 
 class PharmacyVisit(Base):
     """Günlük eczane ziyaretleri - Her gün hangi eczaneler ziyaret edildi"""
-    __tablename__ = "demo_pharmacy_visits"
+    __tablename__ = "pharmacy_visits"
 
     id = Column(Integer, primary_key=True, index=True)
-    employee_id = Column(Integer, ForeignKey("demo_employees.id"), nullable=False, index=True)
-    pharmacy_id = Column(Integer, ForeignKey("demo_pharmacies.id"), nullable=False, index=True)  # Foreign Key
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False, index=True)
+    pharmacy_id = Column(Integer, ForeignKey("pharmacies.id"), nullable=False, index=True)  # Foreign Key
     visit_date = Column(Date, nullable=False, index=True)  # Hangi gün
 
     # Eczane bilgileri (ziyaret sırasında snapshot olarak kaydedilir)

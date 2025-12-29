@@ -239,7 +239,7 @@ export default function DashboardLayout({
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header with Menu Button */}
-        <div className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 p-4 flex items-center justify-between">
+        <div className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 p-4">
           <button
             onClick={() => setSidebarOpen(true)}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -247,8 +247,6 @@ export default function DashboardLayout({
           >
             <Menu className="w-6 h-6 text-gray-600 dark:text-gray-300" />
           </button>
-          <img src="/images/logo.png" alt="Logo" className="h-12 w-auto" />
-          <div className="w-10" /> {/* Spacer for centering logo */}
         </div>
 
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900">

@@ -5,10 +5,10 @@ from ..database import Base
 
 
 class Goal(Base):
-    __tablename__ = "demo_goals"
+    __tablename__ = "goals"
 
     id = Column(Integer, primary_key=True, index=True)
-    employee_id = Column(Integer, ForeignKey("demo_employees.id"), nullable=False)
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
     period = Column(String, nullable=False)  # 'monthly', 'quarterly', 'yearly'
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=False)
