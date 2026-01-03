@@ -96,6 +96,16 @@ export default function LeavesPage() {
       return;
     }
     fetchData();
+
+    // Sayfa focus olduğunda verileri yenile (ayarlardan döndüğünde güncel veriyi görmek için)
+    const handleFocus = () => {
+      fetchData();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   const fetchData = async () => {
@@ -485,16 +495,26 @@ export default function LeavesPage() {
     <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-8">
       {/* Header */}
       <div className="mb-4 sm:mb-8">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">İzin Yönetimi</h1>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+          <div className="flex-1">
+            <div className="flex flex-col sm:flex-row sm:items-baseline gap-2 sm:gap-4">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">İzin Yönetimi</h1>
+              {user?.hire_date && (
+                <div className="flex items-center gap-2 text-sm sm:text-base">
+                  <Calendar className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <span className="text-gray-600 dark:text-gray-400">
+                    İşe Başlama: <span className="font-semibold text-gray-900 dark:text-white">{new Date(user.hire_date).toLocaleDateString('tr-TR')}</span>
+                  </span>
+                </div>
+              )}
+            </div>
             <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">
               {isManager ? 'Çalışanların izinlerini yönetin ve kendi izinlerinizi talep edin' : 'İzin bakiyelerinizi görüntüleyin ve yeni izin talebi oluşturun'}
             </p>
           </div>
           <button
             onClick={() => setShowRequestModal(true)}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm sm:text-base whitespace-nowrap"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm sm:text-base whitespace-nowrap flex-shrink-0"
           >
             <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
             Yeni İzin Talebi
@@ -535,12 +555,15 @@ export default function LeavesPage() {
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">İzin Bakiyelerim ({new Date().getFullYear()})</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {balances.map((balance) => (
-              <div key={balance.id} className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <div key={balance.id} className={`rounded-lg shadow p-6 ${balance.total_days === 0 ? 'bg-gray-50 dark:bg-gray-800/50 border-2 border-gray-300 dark:border-gray-700' : 'bg-white dark:bg-gray-800'}`}>
                 <h3 className="font-semibold text-gray-900 dark:text-white mb-3">{balance.leave_type_name}</h3>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600 dark:text-gray-400">Toplam Hak:</span>
-                    <span className="font-medium dark:text-gray-200">{balance.total_days} gün</span>
+                    <span className={`font-medium ${balance.total_days === 0 ? 'text-gray-500 dark:text-gray-500' : 'text-gray-900 dark:text-gray-200'}`}>
+                      {balance.total_days} gün
+                      {balance.total_days === 0 && <span className="ml-1 text-xs text-gray-400 dark:text-gray-600">(Henüz hak etmediniz)</span>}
+                    </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600 dark:text-gray-400">Kullanılan:</span>
@@ -548,7 +571,13 @@ export default function LeavesPage() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600 dark:text-gray-400">Kalan:</span>
-                    <span className={`font-bold ${balance.remaining_days < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                    <span className={`font-bold ${
+                      balance.remaining_days < 0
+                        ? 'text-red-600 dark:text-red-400'
+                        : balance.total_days === 0
+                        ? 'text-gray-500 dark:text-gray-500'
+                        : 'text-green-600 dark:text-green-400'
+                    }`}>
                       {balance.remaining_days} gün
                     </span>
                   </div>

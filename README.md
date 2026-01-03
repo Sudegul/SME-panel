@@ -17,20 +17,30 @@
 
 ## 🛠️ Teknolojiler
 
-### Backend
-- **FastAPI** - Modern Python web framework
-- **PostgreSQL** - İlişkisel veritabanı
-- **SQLAlchemy** - ORM
-- **JWT** - Authentication
-- **Pydantic** - Data validation
-
 ### Frontend
-- **Next.js 15** - React framework (App Router)
-- **TypeScript** - Type safety
-- **TailwindCSS** - Modern styling
-- **Recharts** - Grafikler
-- **Axios** - HTTP client
-- **React Toastify** - Bildirimler
+- **Framework:** Next.js 14.2.21 (React 18.3.1)
+- **Dil:** TypeScript 5.7.2
+- **Styling:** Tailwind CSS 3.4.0
+- **State Management:** SWR 2.3.8 (React Hooks for data fetching)
+- **HTTP Client:** Axios 1.7.9
+- **UI Kütüphaneleri:**
+  - Lucide React 0.468.0 (Icons)
+  - React Toastify 11.0.5 (Notifications)
+  - Recharts 2.15.0 (Charts/Graphs)
+  - date-fns 4.1.0 (Date manipulation)
+  - xlsx 0.18.5 (Excel export/import)
+
+### Backend
+- **Framework:** FastAPI 0.115.0
+- **Server:** Uvicorn 0.32.0 (ASGI server)
+- **Database:** PostgreSQL + SQLAlchemy 2.0.23 (ORM)
+- **Authentication:** JWT (python-jose 3.3.0 + passlib 1.7.4 + bcrypt 4.1.2)
+- **Data Validation:** Pydantic 2.9.0 + pydantic-settings 2.6.0
+- **Utilities:** python-multipart, python-dotenv
+
+### DevOps
+- Docker + Docker Compose
+- Standalone Next.js build (output: 'standalone')
 
 ## 🚀 Hızlı Başlangıç
 
@@ -173,85 +183,196 @@ Manager'lar **web arayüzünden** kullanıcı yönetimi yapabilir. **Yazılımc�
 - **API Docs**: http://localhost:8000/docs
 - **Frontend**: http://localhost:3000
 
-## 🚀 Sunucuya Yükleme (Production)
+## 🐋 Docker Mekanizması ve Deployment
 
-### Refactoring Gerekir Mi?
+### Docker Mimarisi
 
-**HAYIR!** Sistem tamamen otomatiktir:
-- ✅ Manager web arayüzünden kullanıcı ekler/çıkarır
-- ✅ Pasif kullanıcılar otomatik olarak giriş yapamaz
-- ✅ Tüm veriler korunur (soft delete)
-- ✅ Filtreleme otomatik çalışır
-
-**Yazılımcı müdahalesi GEREKMEZ!**
-
-### Production için Değişiklikler:
-
-#### Backend (`.env`):
-```env
-DATABASE_URL=postgresql://user:password@localhost/sma_panel
-SECRET_KEY=your-super-secret-key-change-this-to-random-string
-ACCESS_TOKEN_EXPIRE_MINUTES=60
-ENVIRONMENT=production
+```
+┌─────────────────────────────────────────────────────────┐
+│                   SUNUCU (VM/Server)                    │
+│                                                         │
+│  ┌──────────────────┐         ┌──────────────────┐     │
+│  │  Frontend        │  Docker │  Backend         │     │
+│  │  Container       │  Network│  Container       │     │
+│  │                  │◄────────┤                  │     │
+│  │  Next.js:3000    │         │  FastAPI:8000    │     │
+│  └────────┬─────────┘         └────────┬─────────┘     │
+│           │                            │                │
+│           │ Port Mapping               │                │
+│           │ 3000:3000                  │ 8000:8000      │
+│           ▼                            ▼                │
+│  ┌─────────────────────────────────────────────┐        │
+│  │         Sunucunun Dış Portları              │        │
+│  │  http://sunucu-ip:3000  (Frontend)          │        │
+│  │  http://sunucu-ip:8000  (Backend API)       │        │
+│  └─────────────────────────────────────────────┘        │
+│                                       │                 │
+│                              host.docker.internal       │
+│                                       ▼                 │
+│  ┌──────────────────────────────────────────────┐       │
+│  │  PostgreSQL (Sunucuda Direkt Çalışıyor)     │       │
+│  │  Port: 5432                                  │       │
+│  └──────────────────────────────────────────────┘       │
+└─────────────────────────────────────────────────────────┘
 ```
 
-#### Frontend (`frontend/lib/axios.ts`):
-```typescript
-// API URL'sini production sunucunuza göre değiştirin
-baseURL: 'https://api.yourdomain.com'
+### Servis Yapısı
+
+**Frontend ve Backend ayrı Docker container'ları olarak çalışır:**
+
+**✅ Avantajları:**
+- Bağımsız ölçeklendirme (Frontend 3x, Backend 5x)
+- Bağımsız güncelleme (Sadece backend'i restart)
+- İzolasyon (Bir crash diğerini etkilemez)
+- Teknoloji bağımsızlığı (Node.js vs Python base image'ları)
+
+### Network İletişimi
+
+**Container ↔ Container (Docker Network içi):**
+```
+Frontend → Backend: http://backend:8000
+```
+- Docker Compose otomatik olarak servis isimlerini DNS olarak tanır
+- `backend` servisi → `backend` hostname'i ile erişilebilir
+
+**Kullanıcı ↔ Container (Port Mapping):**
+```
+http://sunucu-ip:3000  →  Frontend Container (port 3000:3000)
+http://sunucu-ip:8000  →  Backend Container (port 8000:8000)
 ```
 
-#### CORS Ayarları (`backend/app/main.py`):
-```python
-# Sadece kendi domain'inizden gelen isteklere izin verin
-origins = [
-    "https://yourdomain.com",
-]
+**Container ↔ Host PostgreSQL:**
 ```
+Backend → host.docker.internal:5432
+```
+- `host.docker.internal`: Docker'ın özel DNS'i
+- Container'dan host makinenin localhost'una erişim sağlar
 
-### Önerilen Stack:
-- **Frontend**: Vercel / Netlify / Nginx
-- **Backend**: Gunicorn + Uvicorn workers
-- **Database**: PostgreSQL 14+
-- **Reverse Proxy**: Nginx
-- **SSL**: Let's Encrypt (certbot)
-- **Backup**: Günlük PostgreSQL dump
+### Ortam Karşılaştırması
 
-### Deployment Komutları:
+| Ne? | Local (Development) | Sunucu (Docker) |
+|-----|---------------------|-----------------|
+| **Backend Çalışma** | `uvicorn app.main:app` | Docker Container |
+| **Frontend Çalışma** | `npm run dev` | Docker Container |
+| **PostgreSQL** | localhost:5432 | Sunucuda localhost:5432 |
+| **Frontend → Backend** | http://localhost:8000 | http://backend:8000 |
+| **Backend → PostgreSQL** | localhost:5432 | host.docker.internal:5432 |
+| **Kullanıcı Erişimi** | localhost:3000 | sunucu-ip:3000 |
 
-#### Backend (systemd service):
+### Docker Komutları
+
+**Container Yönetimi:**
 ```bash
-# /etc/systemd/system/sma-backend.service
-[Unit]
-Description=SMA Panel Backend
-After=network.target
+# Container'ları başlat
+docker compose up -d
 
-[Service]
-User=www-data
-WorkingDirectory=/var/www/sma-panel/backend
-Environment="PATH=/var/www/sma-panel/backend/venv/bin"
-ExecStart=/var/www/sma-panel/backend/venv/bin/gunicorn -w 4 -k uvicorn.workers.UvicornWorker app.main:app --bind 127.0.0.1:8000
+# Container'ları durdur
+docker compose down
 
-[Install]
-WantedBy=multi-user.target
+# Belirli bir servisi yeniden başlat
+docker compose restart backend
+docker compose restart frontend
+
+# Sadece backend'i rebuild et
+docker compose up -d --build backend
+
+# Kodu güncelledikten sonra
+docker compose up -d --build
 ```
 
-#### Frontend (Next.js):
+**Log İzleme:**
 ```bash
-npm run build
-npm start
-# veya
-# Vercel'e deploy: vercel --prod
+# Tüm log'lar
+docker compose logs -f
+
+# Belirli bir servisin log'u
+docker compose logs -f backend
+docker compose logs -f frontend
+
+# Son 100 satır
+docker compose logs --tail=100
 ```
 
-### Veri Güvenliği:
+**Container İçine Giriş:**
+```bash
+# Backend container'ına giriş
+docker exec -it sme_panel_backend bash
+
+# Frontend container'ına giriş
+docker exec -it sme_panel_frontend sh
+```
+
+### Deployment Adımları
+
+#### 1. Sunucuda Hazırlık
+```bash
+# PostgreSQL'in çalıştığından emin olun
+sudo systemctl status postgresql
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+
+# Docker kurulumunu kontrol edin
+docker --version
+docker compose version
+```
+
+#### 2. Environment Variables
+```bash
+# Backend .env dosyasını düzenleyin
+cd backend
+nano .env
+
+# Önemli değişkenler:
+POSTGRES_HOST=localhost  # Docker'da: host.docker.internal
+POSTGRES_PASSWORD=güvenli-şifre  # ⚠️ Değiştirin!
+SECRET_KEY=min-32-karakter-güçlü-key  # ⚠️ Değiştirin!
+BACKEND_CORS_ORIGINS=https://yourdomain.com
+```
+
+```bash
+# Frontend .env dosyası (zaten oluşturulmuş)
+# Docker Compose içinde otomatik override edilir:
+# NEXT_PUBLIC_API_URL=http://backend:8000
+```
+
+#### 3. Docker ile Başlatma
+```bash
+# Build ve başlat
+docker compose up -d --build
+
+# Log'ları izle
+docker compose logs -f
+
+# Sağlık kontrolü
+docker compose ps
+curl http://localhost:8000/docs
+curl http://localhost:3000
+```
+
+### Production Güvenlik Checklist
+
+⚠️ **Mutlaka Değiştirin:**
+- [ ] PostgreSQL şifresi (güçlü, rastgele)
+- [ ] JWT SECRET_KEY (minimum 32 karakter)
+- [ ] CORS origins (sadece production domain)
+- [ ] Environment files permission: `chmod 600 backend/.env`
+- [ ] SSL/TLS sertifikası (Let's Encrypt)
+- [ ] Firewall kuralları (3000, 8000 portları)
+- [ ] Backup stratejisi (günlük PostgreSQL dump)
+
+### Veri Güvenliği
 - ✅ Şifreler bcrypt ile hash'lenir
 - ✅ JWT token authentication
 - ✅ Rol bazlı yetkilendirme (RBAC)
 - ✅ Pasif kullanıcılar giriş yapamaz
-- ✅ HTTPS kullanımı zorunludur (production)
+- ✅ HTTPS kullanımı (production)
 - ✅ SQL injection koruması (SQLAlchemy ORM)
 - ✅ XSS koruması (React)
+- ✅ Environment variables güvenliği
+
+### Detaylı Deployment Kılavuzu
+
+Daha detaylı deployment talimatları için [DOCKER_SETUP.md](DOCKER_SETUP.md) dosyasına bakın.
 
 ## 🐛 Sorun Giderme
 

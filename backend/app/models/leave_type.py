@@ -19,6 +19,7 @@ class LeaveType(Base):
     max_days = Column(Integer, nullable=False)  # Maksimum gün hakkı
     is_paid = Column(Boolean, default=True)  # Ücretli mi?
     is_active = Column(Boolean, default=True)  # Kullanıma açık mı?
+    is_cumulative = Column(Boolean, default=True)  # Kullanılmayan haklar gelecek yıla taşınsın mı?
     gender_restriction = Column(Enum(GenderRestriction), default=GenderRestriction.NONE)  # Cinsiyet kısıtı
     description = Column(String, nullable=True)  # Açıklama (opsiyonel)
     created_at = Column(DateTime, default=datetime.utcnow)

@@ -80,6 +80,7 @@ export default function SettingsPage() {
     name: '',
     max_days: 0,
     is_paid: true,
+    is_cumulative: true,
     gender_restriction: 'NONE' as 'NONE' | 'MALE_ONLY' | 'FEMALE_ONLY',
     description: ''
   });
@@ -346,7 +347,7 @@ export default function SettingsPage() {
       }
       setShowLeaveTypeModal(false);
       setEditingLeaveType(null);
-      setLeaveTypeForm({ name: '', max_days: 0, is_paid: true, gender_restriction: 'NONE', description: '' });
+      setLeaveTypeForm({ name: '', max_days: 0, is_paid: true, is_cumulative: true, gender_restriction: 'NONE', description: '' });
       fetchData();
     } catch (error: any) {
       console.error('Leave type error:', error);
@@ -572,6 +573,7 @@ export default function SettingsPage() {
                     <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Ad Soyad</th>
                     <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Email</th>
                     <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Rol</th>
+                    <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">İşe Başlama</th>
                     <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Telefon</th>
                     <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">İşlemler</th>
                   </tr>
@@ -618,6 +620,9 @@ export default function SettingsPage() {
                             <option value="ADMIN">ADMIN</option>
                           </select>
                         )}
+                      </td>
+                      <td className="px-2 sm:px-4 lg:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-500 dark:text-gray-300 whitespace-nowrap">
+                        {user.hire_date ? new Date(user.hire_date).toLocaleDateString('tr-TR') : '-'}
                       </td>
                       <td className="px-2 sm:px-4 lg:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-500 dark:text-gray-300 break-words max-w-[100px] sm:max-w-none">{user.phone || '-'}</td>
                       <td className="px-2 sm:px-4 lg:px-6 py-3 sm:py-4 text-xs sm:text-sm">
@@ -727,31 +732,35 @@ export default function SettingsPage() {
                           <div>
                             <label className="block text-sm font-medium mb-1">Minimum</label>
                             <input
-                              type="number"
-                              min="0"
-                              value={scale.min_visits}
+                              type="text"
+                              inputMode="numeric"
+                              value={scale.min_visits || ''}
                               onChange={(e) => {
+                                const value = e.target.value.replace(/[^0-9]/g, '');
                                 const updated = [...editingScales];
                                 const idx = updated.findIndex(s => s.id === scale.id);
-                                updated[idx].min_visits = parseInt(e.target.value) || 0;
+                                updated[idx].min_visits = value ? parseInt(value) : 0;
                                 setEditingScales(updated);
                               }}
+                              onFocus={(e) => e.target.select()}
                               className="w-24 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white"
                             />
                           </div>
                           <div>
                             <label className="block text-sm font-medium mb-1">Maximum</label>
                             <input
-                              type="number"
-                              min="0"
+                              type="text"
+                              inputMode="numeric"
                               value={scale.max_visits ?? ''}
                               placeholder="Sınırsız"
                               onChange={(e) => {
+                                const value = e.target.value.replace(/[^0-9]/g, '');
                                 const updated = [...editingScales];
                                 const idx = updated.findIndex(s => s.id === scale.id);
-                                updated[idx].max_visits = e.target.value === '' ? null : parseInt(e.target.value);
+                                updated[idx].max_visits = value === '' ? null : parseInt(value);
                                 setEditingScales(updated);
                               }}
+                              onFocus={(e) => e.target.select()}
                               className="w-24 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white"
                             />
                           </div>
@@ -782,7 +791,7 @@ export default function SettingsPage() {
             <button
               onClick={() => {
                 setEditingLeaveType(null);
-                setLeaveTypeForm({ name: '', max_days: 0, is_paid: true, gender_restriction: 'NONE', description: '' });
+                setLeaveTypeForm({ name: '', max_days: 0, is_paid: true, is_cumulative: true, gender_restriction: 'NONE', description: '' });
                 setShowLeaveTypeModal(true);
               }}
               className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 text-sm sm:text-base whitespace-nowrap"
@@ -849,6 +858,7 @@ export default function SettingsPage() {
                               name: leaveType.name,
                               max_days: leaveType.max_days,
                               is_paid: leaveType.is_paid,
+                              is_cumulative: leaveType.is_cumulative,
                               gender_restriction: leaveType.gender_restriction,
                               description: leaveType.description || ''
                             });
@@ -986,14 +996,16 @@ export default function SettingsPage() {
                         <td className="px-2 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap">
                           {isEditingRules ? (
                             <input
-                              type="number"
-                              min="0"
-                              value={rule.days_entitled}
+                              type="text"
+                              inputMode="numeric"
+                              value={rule.days_entitled || ''}
                               onChange={(e) => {
+                                const value = e.target.value.replace(/[^0-9]/g, '');
                                 const updated = [...editingRules];
-                                updated[index].days_entitled = parseInt(e.target.value) || 0;
+                                updated[index].days_entitled = value ? parseInt(value) : 0;
                                 setEditingRules(updated);
                               }}
+                              onFocus={(e) => e.target.select()}
                               className="w-20 sm:w-24 px-2 sm:px-3 py-1 sm:py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-xs sm:text-sm"
                             />
                           ) : (
@@ -1062,11 +1074,15 @@ export default function SettingsPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Maksimum Gün Sayısı</label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     required
-                    min="0"
-                    value={leaveTypeForm.max_days}
-                    onChange={(e) => setLeaveTypeForm({...leaveTypeForm, max_days: parseInt(e.target.value) || 0})}
+                    value={leaveTypeForm.max_days || ''}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9]/g, '');
+                      setLeaveTypeForm({...leaveTypeForm, max_days: value ? parseInt(value) : 0});
+                    }}
+                    onFocus={(e) => e.target.select()}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                   />
                 </div>
@@ -1081,6 +1097,20 @@ export default function SettingsPage() {
                   <option value="true">Ücretli</option>
                   <option value="false">Ücretsiz</option>
                 </select>
+              </div>
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={leaveTypeForm.is_cumulative}
+                    onChange={(e) => setLeaveTypeForm({...leaveTypeForm, is_cumulative: e.target.checked})}
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <span>Kullanılmayan günler gelecek yıla taşınsın</span>
+                </label>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  İşaretlenirse: Yıllık izin gibi birikir. İşaretlenmezse: Doğum/evlilik izni gibi her yıl sıfırlanır.
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cinsiyet Kısıtı</label>
@@ -1110,7 +1140,7 @@ export default function SettingsPage() {
                   onClick={() => {
                     setShowLeaveTypeModal(false);
                     setEditingLeaveType(null);
-                    setLeaveTypeForm({ name: '', max_days: 0, is_paid: true, gender_restriction: 'NONE', description: '' });
+                    setLeaveTypeForm({ name: '', max_days: 0, is_paid: true, is_cumulative: true, gender_restriction: 'NONE', description: '' });
                   }}
                   className="flex-1 px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500"
                 >
