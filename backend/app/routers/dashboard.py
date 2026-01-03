@@ -43,15 +43,8 @@ def get_dashboard_stats(
             start_date = today
             end_date = today
         elif period == "week":
-            # Bu hafta: Önceki pazar 00:00'dan bugüne kadar
-            weekday = today.weekday()
-            if weekday == 6:  # Bugün pazar
-                days_since_sunday = 0
-            else:
-                days_since_sunday = weekday + 1
-
-            last_sunday = today - timedelta(days=days_since_sunday)
-            start_date = last_sunday
+            # Son 7 gün
+            start_date = today - timedelta(days=7)
             end_date = today
         elif period == "last-week":
             # Geçen hafta: 2 pazar öncesi 00:00'dan geçen pazar 23:59'a kadar
@@ -66,10 +59,12 @@ def get_dashboard_stats(
             start_date = prev_sunday
             end_date = last_sunday - timedelta(days=1)  # Geçen cumartesi 23:59
         elif period == "month":
-            start_date = today.replace(day=1)
+            # Son 30 gün
+            start_date = today - timedelta(days=30)
             end_date = today
         elif period == "year":
-            start_date = today.replace(month=1, day=1)
+            # Son 365 gün
+            start_date = today - timedelta(days=365)
             end_date = today
         else:
             # Varsayılan: Son 30 gün
@@ -544,33 +539,46 @@ def get_chart_data(
             })
 
     else:  # year
-        # Son 11 ay + bu ay (toplam 11 ay)
+        # Son 12 ay (bugünden geriye 12 ay)
         data = []
         months = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"]
 
-        for i in range(10, -1, -1):
-            month_date = today - timedelta(days=i*30)
-            month_num = month_date.month
+        for i in range(11, -1, -1):
+            # i ay önce
+            if i == 0:
+                target_month = today.month
+                target_year = today.year
+            else:
+                # i ay önceki ay ve yılı hesapla
+                months_ago = i
+                target_year = today.year
+                target_month = today.month - months_ago
+
+                while target_month <= 0:
+                    target_month += 12
+                    target_year -= 1
 
             visit_count = db.query(func.count(DoctorVisit.id)).filter(
                 and_(
-                    extract('year', DoctorVisit.visit_date) == month_date.year,
-                    extract('month', DoctorVisit.visit_date) == month_num
+                    extract('year', DoctorVisit.visit_date) == target_year,
+                    extract('month', DoctorVisit.visit_date) == target_month
                 )
             ).scalar() or 0
 
             sales_count = db.query(func.coalesce(func.sum(PharmacyVisit.product_count), 0)).filter(
                 and_(
-                    extract('year', PharmacyVisit.visit_date) == month_date.year,
-                    extract('month', PharmacyVisit.visit_date) == month_num
+                    extract('year', PharmacyVisit.visit_date) == target_year,
+                    extract('month', PharmacyVisit.visit_date) == target_month
                 )
             ).scalar() or 0
 
-            data.append({
-                "name": months[month_num - 1],
-                "ziyaret": visit_count,
-                "satis": int(sales_count)
-            })
+            # Sadece veri olan ayları ekle (0 olanları atla)
+            if visit_count > 0 or sales_count > 0:
+                data.append({
+                    "name": months[target_month - 1],
+                    "ziyaret": visit_count,
+                    "satis": int(sales_count)
+                })
 
     return data
 
@@ -581,10 +589,10 @@ def get_doctor_visits_pie(
     current_user: Employee = Depends(get_current_user)
 ):
     """
-    Hekim ziyaretleri pasta grafiği - Çalışan bazlı oranlar (bu ay)
+    Hekim ziyaretleri pasta grafiği - Çalışan bazlı oranlar (son 30 gün)
     """
     today = date.today()
-    start_date = today.replace(day=1)
+    start_date = today - timedelta(days=30)
     start_datetime = datetime.combine(start_date, datetime.min.time())
     end_datetime = datetime.combine(today, datetime.max.time())
 
@@ -621,10 +629,10 @@ def get_pharmacy_visits_pie(
     current_user: Employee = Depends(get_current_user)
 ):
     """
-    Eczane ziyaretleri pasta grafiği - Çalışan bazlı oranlar (bu ay)
+    Eczane ziyaretleri pasta grafiği - Çalışan bazlı oranlar (son 30 gün)
     """
     today = date.today()
-    start_date = today.replace(day=1)
+    start_date = today - timedelta(days=30)
     start_datetime = datetime.combine(start_date, datetime.min.time())
     end_datetime = datetime.combine(today, datetime.max.time())
 

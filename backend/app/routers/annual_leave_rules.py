@@ -68,6 +68,7 @@ def update_annual_leave_rules(
 
 def calculate_annual_leave_days(hire_date, current_year: int, db: Session) -> int:
     """
+    [ESKİ SİSTEM - DEPRECATED]
     İşe giriş tarihine göre yıllık izin hakkını hesapla
 
     Args:
@@ -95,6 +96,62 @@ def calculate_annual_leave_days(hire_date, current_year: int, db: Session) -> in
     # Kurallara göre hak edilen günü bul
     rule = db.query(AnnualLeaveRule).filter(
         AnnualLeaveRule.year_of_service == year_index
+    ).first()
+
+    if rule:
+        return rule.days_entitled
+
+    # Kural yoksa en yüksek yıla ait kuralı kullan
+    max_rule = db.query(AnnualLeaveRule).order_by(
+        AnnualLeaveRule.year_of_service.desc()
+    ).first()
+
+    if max_rule:
+        return max_rule.days_entitled
+
+    # Hiç kural yoksa varsayılan
+    return 14
+
+
+def calculate_annual_leave_days_by_service_year(service_year: int, db: Session) -> int:
+    """
+    [YENİ SİSTEM]
+    Service year'a göre yıllık izin hakkını hesapla
+
+    service_year = Kaç yıldönümü GEÇTİ (0'dan başlar)
+    - service_year = 0: Henüz yıldönümü gelmedi → 0 gün
+    - service_year = 1: 1. yıldönümü geçti → year_of_service=1 kuralı
+    - service_year = 2: 2. yıldönümü geçti → year_of_service=2 kuralı
+    - service_year = 5: 5. yıldönümü geçti → year_of_service=5 kuralı
+
+    Args:
+        service_year: Kaç yıldönümü geçti (0, 1, 2, 3...)
+        db: Database session
+
+    Returns:
+        Hak edilen yıllık izin günü
+
+    Örnek:
+        service_year = 0 -> 0 gün (henüz yıldönümü gelmedi)
+        service_year = 1 -> 14 gün (1. yıldönümü geçti, year_of_service=1 kuralı)
+        service_year = 5 -> 20 gün (5. yıldönümü geçti, year_of_service=5 kuralı)
+        service_year = 15 -> 26 gün (15. yıldönümü geçti, year_of_service=15 kuralı)
+    """
+    if service_year < 0:
+        service_year = 0
+
+    # Henüz yıldönümü gelmediyse hak yok
+    if service_year == 0:
+        return 0
+
+    # service_year = year_of_service (bire bir eşleşiyor)
+    # service_year = 1 → year_of_service = 1 (1. yıldönümü)
+    # service_year = 2 → year_of_service = 2 (2. yıldönümü)
+    year_of_service = service_year
+
+    # Kurallara göre hak edilen günü bul
+    rule = db.query(AnnualLeaveRule).filter(
+        AnnualLeaveRule.year_of_service == year_of_service
     ).first()
 
     if rule:

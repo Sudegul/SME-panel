@@ -3,7 +3,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from typing import List, Optional
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 import io
@@ -25,40 +25,191 @@ from ..utils.dependencies import get_current_user
 router = APIRouter(prefix="/leave-requests", tags=["Leave Requests"])
 
 
-def get_or_create_balance(db: Session, employee_id: int, leave_type_id: int, year: int) -> LeaveBalance:
-    """İzin bakiyesi yoksa oluştur, varsa getir"""
+def calculate_service_year(hire_date: date, check_date: date = None) -> int:
+    """
+    İşe giriş tarihine göre kaç yıldönümü geçtiğini hesapla
+
+    service_year = Kaç yıldönümü GEÇTİ
+    - 0: Henüz yıldönümü gelmedi (1. yıl içinde)
+    - 1: 1. yıldönümü geçti (2. yıl içinde)
+    - 2: 2. yıldönümü geçti (3. yıl içinde)
+
+    Örnek:
+    - hire_date: 2024-06-15
+    - check_date: 2025-05-01 -> service_year = 0 (henüz 1. yıldönümü gelmedi)
+    - check_date: 2025-06-15 -> service_year = 1 (1. yıldönümü bugün)
+    - check_date: 2025-07-01 -> service_year = 1 (1. yıldönümü geçti)
+    - check_date: 2026-07-01 -> service_year = 2 (2. yıldönümü geçti)
+    """
+    if not hire_date:
+        return 0
+
+    if not check_date:
+        check_date = date.today()
+
+    # Kaç tam yıl geçti hesapla
+    years_passed = check_date.year - hire_date.year
+
+    # Eğer yıldönümü henüz gelmediyse bir yıl azalt
+    anniversary_this_year = hire_date.replace(year=check_date.year)
+    if check_date < anniversary_this_year:
+        years_passed -= 1
+
+    # service_year = kaç yıldönümü geçti (0'dan başlar)
+    return max(0, years_passed)
+
+
+def get_service_year_dates(hire_date: date, service_year: int) -> tuple:
+    """
+    Belirtilen service year'ın başlangıç ve bitiş tarihlerini döndür
+
+    service_year = Kaç yıldönümü geçti (0'dan başlar)
+
+    Örnek:
+    - hire_date: 2024-06-15, service_year: 0
+      -> (2024-06-15, 2025-06-14) [1. yıl, henüz yıldönümü gelmedi]
+    - hire_date: 2024-06-15, service_year: 1
+      -> (2025-06-15, 2026-06-14) [2. yıl, 1. yıldönümü geçti]
+    - hire_date: 2024-06-15, service_year: 2
+      -> (2026-06-15, 2027-06-14) [3. yıl, 2. yıldönümü geçti]
+    """
+    if not hire_date:
+        # Fallback: Takvim yılı kullan
+        today = date.today()
+        return (date(today.year, 1, 1), date(today.year, 12, 31))
+
+    # Başlangıç: hire_date + service_year yıl
+    start_year = hire_date.year + service_year
+    start_date = hire_date.replace(year=start_year)
+
+    # Bitiş: başlangıç + 1 yıl - 1 gün
+    end_date = start_date.replace(year=start_date.year + 1) - timedelta(days=1)
+
+    return (start_date, end_date)
+
+
+def get_or_create_balance(db: Session, employee_id: int, leave_type_id: int, service_year: int = None) -> LeaveBalance:
+    """
+    İzin bakiyesi yoksa oluştur, varsa getir
+
+    YENİ SİSTEM: service_year kullanıyor (işe giriş yıldönümüne göre)
+    - Geçen yıldan kalan izinleri otomatik taşır
+    - Her izin türü için ayrı hesaplama yapar
+    - EKSİK GEÇMIŞ YILLARI OTOMATIK OLUŞTURUR (backfill)
+    """
+    employee = db.query(Employee).filter(Employee.id == employee_id).first()
+    if not employee:
+        raise HTTPException(status_code=404, detail="Çalışan bulunamadı")
+
+    leave_type = db.query(LeaveType).filter(LeaveType.id == leave_type_id).first()
+    if not leave_type:
+        raise HTTPException(status_code=404, detail="İzin türü bulunamadı")
+
+    # Eğer service_year verilmemişse bugünkü tarihe göre hesapla
+    if service_year is None:
+        service_year = calculate_service_year(employee.hire_date)
+
+    # ÖNEMLİ: Eksik geçmiş yılları oluştur (backfill)
+    # Örnek: service_year=3 isteniyor ama 1 ve 2 yoksa, önce 1 ve 2'yi oluştur
+    _backfill_missing_service_years(db, employee, leave_type, service_year)
+
+    # Mevcut service_year için bakiye var mı kontrol et
     balance = db.query(LeaveBalance).filter(
         and_(
             LeaveBalance.employee_id == employee_id,
             LeaveBalance.leave_type_id == leave_type_id,
-            LeaveBalance.year == year
+            LeaveBalance.service_year == service_year
         )
     ).first()
 
-    if not balance:
-        # Bakiye yoksa oluştur
-        leave_type = db.query(LeaveType).filter(LeaveType.id == leave_type_id).first()
-        employee = db.query(Employee).filter(Employee.id == employee_id).first()
+    if balance:
+        # Mevcut bakiye varsa, current_year_entitlement'ı güncelle (izin türü değişirse)
+        # Sadece Yıllık İzin dışındaki izinler için
+        if leave_type.name != "Yıllık İzin":
+            expected_entitlement = leave_type.max_days if leave_type.max_days else 0
+            if balance.current_year_entitlement != expected_entitlement:
+                # İzin türünün max_days değeri değişmiş, güncelle
+                balance.current_year_entitlement = expected_entitlement
+                balance.total_days = balance.carried_over_days + expected_entitlement
+                balance.remaining_days = balance.total_days - balance.used_days
+                db.commit()
+                db.refresh(balance)
+        return balance
 
-        # Yıllık izin türü için hire_date'e göre hesapla
-        if leave_type.name == "Yıllık İzin" and employee and employee.hire_date:
-            from .annual_leave_rules import calculate_annual_leave_days
-            total_days = calculate_annual_leave_days(employee.hire_date, year, db)
-        else:
-            # Diğer izin türleri için max_days kullan
-            total_days = leave_type.max_days
+    # Buraya gelmemeli (backfill zaten oluşturmuş olmalı)
+    # Ama yine de oluştur
+    return _create_balance_for_service_year(db, employee, leave_type, service_year)
 
-        balance = LeaveBalance(
-            employee_id=employee_id,
-            leave_type_id=leave_type_id,
-            year=year,
-            total_days=total_days,
-            used_days=0,
-            remaining_days=total_days
+
+def _backfill_missing_service_years(db: Session, employee: Employee, leave_type: LeaveType, target_service_year: int):
+    """
+    Eksik geçmiş service_year kayıtlarını otomatik oluşturur
+
+    Örnek: target_service_year=3 ama sadece service_year=3 var
+    -> service_year=0, 1 ve service_year=2'yi oluşturur
+    -> carry-over hesaplamaları doğru olur
+    """
+    # Hangi service_year'lar var kontrol et
+    existing_years = db.query(LeaveBalance.service_year).filter(
+        and_(
+            LeaveBalance.employee_id == employee.id,
+            LeaveBalance.leave_type_id == leave_type.id
         )
-        db.add(balance)
-        db.commit()
-        db.refresh(balance)
+    ).all()
+    existing_years = {year[0] for year in existing_years}
+
+    # Eksik yılları bul ve oluştur (0'dan target_service_year'a kadar)
+    # service_year=0 da gösterilmeli (1. yıl, henüz hak etmedi -> 0 gün)
+    for year in range(0, max(1, target_service_year + 1)):
+        if year not in existing_years:
+            _create_balance_for_service_year(db, employee, leave_type, year)
+
+
+def _create_balance_for_service_year(db: Session, employee: Employee, leave_type: LeaveType, service_year: int) -> LeaveBalance:
+    """
+    Belirli bir service_year için yeni bakiye kaydı oluşturur
+    """
+    # 1. Bu yıl için hak edilen günleri hesapla
+    if service_year == 0:
+        current_year_entitlement = 0
+    elif leave_type.name == "Yıllık İzin" and employee.hire_date:
+        from .annual_leave_rules import calculate_annual_leave_days_by_service_year
+        current_year_entitlement = calculate_annual_leave_days_by_service_year(service_year, db)
+    else:
+        current_year_entitlement = leave_type.max_days if leave_type.max_days else 0
+
+    # 2. Geçen yıldan kalan günleri hesapla (sadece biriken izinlerde)
+    carried_over_days = 0
+    if service_year > 0 and leave_type.is_cumulative:
+        previous_balance = db.query(LeaveBalance).filter(
+            and_(
+                LeaveBalance.employee_id == employee.id,
+                LeaveBalance.leave_type_id == leave_type.id,
+                LeaveBalance.service_year == service_year - 1
+            )
+        ).first()
+
+        if previous_balance:
+            carried_over_days = previous_balance.remaining_days
+
+    # 3. Toplam günleri hesapla
+    total_days = carried_over_days + current_year_entitlement
+
+    # 4. Yeni bakiye kaydı oluştur
+    balance = LeaveBalance(
+        employee_id=employee.id,
+        leave_type_id=leave_type.id,
+        service_year=service_year,
+        year=None,
+        carried_over_days=carried_over_days,
+        current_year_entitlement=current_year_entitlement,
+        total_days=total_days,
+        used_days=0,
+        remaining_days=total_days
+    )
+    db.add(balance)
+    db.commit()
+    db.refresh(balance)
 
     return balance
 
@@ -125,26 +276,36 @@ def get_leave_requests(
 
 @router.get("/my-balances", response_model=List[LeaveBalanceResponse])
 def get_my_leave_balances(
-    year: Optional[int] = None,
+    service_year: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: Employee = Depends(get_current_user)
 ):
-    """Çalışanın izin bakiyelerini getir"""
-    if not year:
-        year = datetime.now().year
+    """
+    Çalışanın izin bakiyelerini getir
+
+    YENİ SİSTEM: service_year kullanıyor (işe giriş yıldönümüne göre)
+    - service_year verilmezse şu anki service_year'ı hesaplar
+    - Geçen yıldan taşınan günleri gösterir
+    """
+    # service_year verilmemişse bugünkü tarihe göre hesapla
+    if service_year is None:
+        service_year = calculate_service_year(current_user.hire_date)
 
     # Tüm aktif izin türleri için bakiyeleri getir/oluştur
     active_leave_types = db.query(LeaveType).filter(LeaveType.is_active == True).all()
 
     balances = []
     for leave_type in active_leave_types:
-        balance = get_or_create_balance(db, current_user.id, leave_type.id, year)
+        balance = get_or_create_balance(db, current_user.id, leave_type.id, service_year)
         balances.append(LeaveBalanceResponse(
             id=balance.id,
             employee_id=balance.employee_id,
             leave_type_id=balance.leave_type_id,
             leave_type_name=leave_type.name,
             year=balance.year,
+            service_year=balance.service_year,
+            carried_over_days=balance.carried_over_days,
+            current_year_entitlement=balance.current_year_entitlement,
             total_days=balance.total_days,
             used_days=balance.used_days,
             remaining_days=balance.remaining_days,
@@ -202,12 +363,12 @@ def create_leave_request(
                 detail="Bu izin türü sadece kadın çalışanlar için geçerlidir"
             )
 
-    # Bakiye kontrolü - Yıllık izin hariç diğerlerinde kontrol et
-    year = request_data.start_date.year
-    balance = get_or_create_balance(db, current_user.id, leave_type.id, year)
+    # Bakiye kontrolü - YENİ SİSTEM: service_year kullan
+    service_year = calculate_service_year(current_user.hire_date, request_data.start_date)
+    balance = get_or_create_balance(db, current_user.id, leave_type.id, service_year)
 
-    # "Yıllık İzin" dışındaki izin türleri için bakiye kontrolü yap
-    if leave_type.name != "Yıllık İzin" and balance.remaining_days < request_data.total_days:
+    # Bakiye kontrolü - Tüm izin türleri için kontrol et
+    if balance.remaining_days < request_data.total_days:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Yetersiz bakiye. Kalan: {balance.remaining_days} gün, İstenilen: {request_data.total_days} gün"
@@ -359,9 +520,10 @@ def approve_or_reject_leave_request(
         leave_request.approved_by = current_user.id
         leave_request.approved_at = datetime.utcnow()
 
-        # Bakiyeyi güncelle
-        year = leave_request.start_date.year
-        balance = get_or_create_balance(db, leave_request.employee_id, leave_request.leave_type_id, year)
+        # Bakiyeyi güncelle - YENİ SİSTEM: service_year kullan
+        employee = db.query(Employee).filter(Employee.id == leave_request.employee_id).first()
+        service_year = calculate_service_year(employee.hire_date, leave_request.start_date)
+        balance = get_or_create_balance(db, leave_request.employee_id, leave_request.leave_type_id, service_year)
         balance.used_days += leave_request.total_days
         balance.remaining_days -= leave_request.total_days
 
@@ -509,10 +671,11 @@ def cancel_leave_request(
             )
 
     # Manager için: APPROVED izinleri iptal edebilir, bakiyeyi geri iade eder
-    # Eğer daha önce approved idiyse bakiyeyi geri al
+    # Eğer daha önce approved idiyse bakiyeyi geri al - YENİ SİSTEM: service_year kullan
     if leave_request.status == LeaveRequestStatus.APPROVED:
-        year = leave_request.start_date.year
-        balance = get_or_create_balance(db, leave_request.employee_id, leave_request.leave_type_id, year)
+        employee = db.query(Employee).filter(Employee.id == leave_request.employee_id).first()
+        service_year = calculate_service_year(employee.hire_date, leave_request.start_date)
+        balance = get_or_create_balance(db, leave_request.employee_id, leave_request.leave_type_id, service_year)
         balance.used_days -= leave_request.total_days
         balance.remaining_days += leave_request.total_days
 
@@ -741,9 +904,10 @@ def edit_approved_leave_dates(
     old_total_days = leave_request.total_days
     new_total_days = (new_end_date - leave_request.start_date).days + 1
 
-    # Bakiyeyi güncelle
-    year = leave_request.start_date.year
-    balance = get_or_create_balance(db, leave_request.employee_id, leave_request.leave_type_id, year)
+    # Bakiyeyi güncelle - YENİ SİSTEM: service_year kullan
+    employee = db.query(Employee).filter(Employee.id == leave_request.employee_id).first()
+    service_year = calculate_service_year(employee.hire_date, leave_request.start_date)
+    balance = get_or_create_balance(db, leave_request.employee_id, leave_request.leave_type_id, service_year)
 
     # Eski günleri geri ver
     balance.used_days -= old_total_days

@@ -238,8 +238,8 @@ export default function DashboardLayout({
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header with Menu Button */}
-        <div className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 p-4">
+        {/* Header Area - Hamburger ve Kullanıcı Bilgisi */}
+        <div className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 p-4 flex items-center justify-between">
           <button
             onClick={() => setSidebarOpen(true)}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -247,6 +247,19 @@ export default function DashboardLayout({
           >
             <Menu className="w-6 h-6 text-gray-600 dark:text-gray-300" />
           </button>
+
+          <div className="flex items-center gap-2">
+            <div className="text-right hidden sm:block">
+              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                {user?.full_name}
+              </p>
+              {user?.role && (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {user?.role === 'ADMIN' ? 'ADMIN' : user?.role === 'MANAGER' ? 'MANAGER' : 'ÇALIŞAN'}
+                </p>
+              )}
+            </div>
+          </div>
         </div>
 
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900">

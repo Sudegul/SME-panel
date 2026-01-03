@@ -9,6 +9,7 @@ class LeaveTypeBase(BaseModel):
     max_days: int = Field(..., gt=0)
     is_paid: bool = True
     is_active: bool = True
+    is_cumulative: bool = True
     gender_restriction: GenderRestriction = GenderRestriction.NONE
     description: Optional[str] = None
 
@@ -22,6 +23,7 @@ class LeaveTypeUpdate(BaseModel):
     max_days: Optional[int] = Field(None, gt=0)
     is_paid: Optional[bool] = None
     is_active: Optional[bool] = None
+    is_cumulative: Optional[bool] = None
     gender_restriction: Optional[GenderRestriction] = None
     description: Optional[str] = None
 

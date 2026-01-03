@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from '@/lib/axios';
-import { Star, TrendingUp, Users, Package } from 'lucide-react';
+import { Star, Users, Package } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 interface DashboardStats {
@@ -44,11 +44,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (user) fetchVisitStats();
-  }, [visitPeriod]);
+  }, [visitPeriod, period]); // period değişince de güncelle
 
   useEffect(() => {
     if (user) fetchSalesStats();
-  }, [salesPeriod]);
+  }, [salesPeriod, period]); // period değişince de güncelle
 
   useEffect(() => {
     if (user) fetchGraphStats();
@@ -90,14 +90,17 @@ export default function Dashboard() {
   const fetchVisitStats = async () => {
     try {
       setVisitLoading(true);
-      let visitPeriodParam = 'week';
-      if (visitPeriod === 'today') visitPeriodParam = 'day';
-      else if (visitPeriod === 'this-week') visitPeriodParam = 'week';
-      else if (visitPeriod === 'last-week') visitPeriodParam = 'last-week';
-      else if (visitPeriod === 'this-month') visitPeriodParam = 'month';
-      else if (visitPeriod === 'this-year') visitPeriodParam = 'year';
+      // Ana filtre ile senkronize: eğer dropdown varsayılan değerde ise ana filtreyi kullan
+      let periodToUse = period; // Ana filtre (week/month/year)
 
-      const res = await axios.get(`/dashboard/stats?period=${visitPeriodParam}`);
+      // Eğer kullanıcı dropdown'dan özel bir şey seçmişse onu kullan
+      if (visitPeriod === 'today') periodToUse = 'day';
+      else if (visitPeriod === 'this-week') periodToUse = 'week';
+      else if (visitPeriod === 'last-week') periodToUse = 'last-week';
+      else if (visitPeriod === 'this-month') periodToUse = 'month';
+      else if (visitPeriod === 'this-year') periodToUse = 'year';
+
+      const res = await axios.get(`/dashboard/stats?period=${periodToUse}`);
       setVisitStats(res.data);
     } catch (error: any) {
       console.error('Ziyaret istatistikleri yüklenirken hata:', error);
@@ -113,14 +116,17 @@ export default function Dashboard() {
   const fetchSalesStats = async () => {
     try {
       setSalesLoading(true);
-      let salesPeriodParam = 'month';
-      if (salesPeriod === 'today') salesPeriodParam = 'day';
-      else if (salesPeriod === 'this-week') salesPeriodParam = 'week';
-      else if (salesPeriod === 'last-week') salesPeriodParam = 'last-week';
-      else if (salesPeriod === 'this-month') salesPeriodParam = 'month';
-      else if (salesPeriod === 'this-year') salesPeriodParam = 'year';
+      // Ana filtre ile senkronize: eğer dropdown varsayılan değerde ise ana filtreyi kullan
+      let periodToUse = period; // Ana filtre (week/month/year)
 
-      const res = await axios.get(`/dashboard/stats?period=${salesPeriodParam}`);
+      // Eğer kullanıcı dropdown'dan özel bir şey seçmişse onu kullan
+      if (salesPeriod === 'today') periodToUse = 'day';
+      else if (salesPeriod === 'this-week') periodToUse = 'week';
+      else if (salesPeriod === 'last-week') periodToUse = 'last-week';
+      else if (salesPeriod === 'this-month') periodToUse = 'month';
+      else if (salesPeriod === 'this-year') periodToUse = 'year';
+
+      const res = await axios.get(`/dashboard/stats?period=${periodToUse}`);
       setSalesStats(res.data);
     } catch (error: any) {
       console.error('Satış istatistikleri yüklenirken hata:', error);
@@ -238,8 +244,8 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* 3 Bölüm */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* 2 Bölüm */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Toplam Ziyaretler */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900 p-6">
             <div className="flex items-center justify-between mb-4">
@@ -314,42 +320,6 @@ export default function Dashboard() {
                   <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                     {salesLoading ? '...' : `₺${salesStats.sales.total_revenue.toLocaleString('tr-TR')}`}
                   </p>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-32 text-gray-400 dark:text-gray-500">
-                Yükleniyor...
-              </div>
-            )}
-          </div>
-
-          {/* Hedef Durumu */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900 p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <TrendingUp className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Hedef Durumu</h3>
-            </div>
-            {stats?.goal ? (
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-600 dark:text-gray-400">Ziyaret</span>
-                    <span className="font-semibold dark:text-gray-200">{stats.goal.visit_progress.toFixed(1)}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                    <div className="bg-purple-600 dark:bg-purple-500 h-2 rounded-full" style={{ width: `${Math.min(stats.goal.visit_progress, 100)}%` }} />
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{stats.goal.current_visits} / {stats.goal.target_visits}</p>
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-600 dark:text-gray-400">Satış</span>
-                    <span className="font-semibold dark:text-gray-200">{stats.goal.sales_progress.toFixed(1)}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                    <div className="bg-green-600 dark:bg-green-500 h-2 rounded-full" style={{ width: `${Math.min(stats.goal.sales_progress, 100)}%` }} />
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">₺{stats.goal.current_sales.toLocaleString()} / ₺{stats.goal.target_sales.toLocaleString()}</p>
                 </div>
               </div>
             ) : (
